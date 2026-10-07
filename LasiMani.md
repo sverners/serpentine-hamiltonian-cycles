@@ -14,6 +14,7 @@ pārveidot ļoti garus ceļus (simtiem tūkstošu gājienu).
 
 ## Satura rādītājs
 
+- [Saites](#saites)
 - [Darbplūsma](#darbplūsma)
 - [Rīki](#rīki)
   - [Python](#python-rīki)
@@ -21,6 +22,11 @@ pārveidot ļoti garus ceļus (simtiem tūkstošu gājienu).
   - [Tīmekļa skatītājs](#tīmekļa-skatītājs)
 - [Failu formāti](#failu-formāti)
 - [Prasības](#prasības)
+
+## Saites
+
+- 🌐 Projekta lapa (GitHub Pages): <https://sverners.github.io/serpentine-hamiltonian-cycles/>
+- 🏠 Autora mājaslapa: <https://verneraweb.wuaze.com/index.html>
 
 ## Darbplūsma
 

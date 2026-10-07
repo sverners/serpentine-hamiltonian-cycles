@@ -14,13 +14,19 @@ long paths (hundreds of thousands of moves) compactly.
 
 ## Contents
 
-- [   ](#workflow)
+- [Links](#links)
+- [Workflow](#workflow)
 - [Tools](#tools)
   - [Python](#python-tools)
   - [C#](#c-tools)
   - [Web viewer](#web-viewer)
 - [File formats](#file-formats)
 - [Requirements](#requirements)
+
+## Links
+
+- 🌐 Project page (GitHub Pages): <https://sverners.github.io/serpentine-hamiltonian-cycles/>
+- 🏠 Author's website: <https://verneraweb.wuaze.com/index.html>
 
 ## Workflow
 

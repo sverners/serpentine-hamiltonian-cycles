@@ -27,7 +27,7 @@ pārveidot ļoti garus ceļus (simtiem tūkstošu gājienu).
 Tipiska pilna ceļa: no attēla/formas līdz gatavam apvienotam Hamiltona ciklam.
 
 ```
-1. zirgaGaljumsGen.exe 6 6
+1. serpentinaHC3_6x6.exe 6 6
    → ģenerē 6×6 zirdziņa cikla blokus (cikls4abt6x6.hrz)
 
 2. python cycles_to_gatavie_abt_6x6.py cikls4abt6x6.hrz gatavie_abt_6x6
@@ -59,7 +59,6 @@ Tipiska pilna ceļa: no attēla/formas līdz gatavam apvienotam Hamiltona ciklam
 | `serpentina_hc_v12.py` | Saliek 6×6 (vai 16×16) blokus lielākā "palagā" pēc FFseciba shēmas. Atbalsta atvērtus un slēgtus ceļus, progresa ziņojumus meklēšanas laikā. |
 | `diagnose_ffseciba.py` | Diagnostikas rīks — izsmeļoši pārbauda katru bloku pāreju FFseciba shēmā. |
 | `png_sensors_to_ffseciba.py` | PNG attēls → FFseciba.txt. Atpazīst gan blīvu taisnstūri ar sensoru izgriezumiem, gan tievu līniju/spirāli/kontūru (ar iztieknošanu, spuru tīrīšanu, savienoto komponenšu meklēšanu). |
-| `ffseciba_txt_to_csv_formulas.py` | Pārvērš FFseciba.txt par CSV ar ķēdes formulām (ērtai rediģēšanai Excel/LibreOffice). |
 
 **Nepieciešamās bibliotēkas:** `numpy`, `Pillow` (PIL), `scikit-image`, `scipy`.
 

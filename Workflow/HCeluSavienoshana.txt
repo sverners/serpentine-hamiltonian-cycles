@@ -1,0 +1,12 @@
+hrzCreate.html			- nav iexkljauc webaa
+HCeluSavienoshana.html	- nav iexkljauc webaa - pats maak piedaavaat savienot pareizaa vietaa noliktu "NEsapleestu pamata objektu" ar "sapleestu importeeto objektu"
+						- jaaklixhkjina uz pareizaam vietaam, lai pieliip tiemm importeetaa objekta galiem! Peec tam vnk jaasaglabaa! (skatiit SkatiMani.jpg)
+						
+HCeluSavienoshana.html ir izveidots C#, lai var straadaat ar patieshaam lieliem palagiem iexh C:\Users\svern\source\repos\HCeluSavienoshana\bin\Debug un saucas 
+HCeluSavienoshana.exe - straadaat arii vieglaak. Vnk jaasabiida tuvu un katram ar klikshkji abus paarpleesh! Ja buus pareizi, tad uzreiz paradiis raustiitas saites, un var shio staavokli saglabaat iexh HRZ vai BIN.
+ - vajadzeetu pielikt koordinaateem +-10 un +-100 pogas, lai vieglaak tikt pie vajadziigaam shuunaam
+
+
+mikroScope.html - papildinaats ar visu ko, bet jaunaakais ir SVG apskates faila gjeneraacija, kuraa straadaa peles zoom-s ar "riteniiti". 
+				  - Dubultklikshkjis pievelk 78 shuunas ekraana augstumaa, otreiz dubulkllikshkjis atgriezj saakotneeejo, t.i. 0x palielinaajumu!
+					Tagad var iztikt bez PDFiem!

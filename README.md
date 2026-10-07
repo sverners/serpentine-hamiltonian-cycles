@@ -14,7 +14,7 @@ long paths (hundreds of thousands of moves) compactly.
 
 ## Contents
 
-- [Workflow](#workflow)
+- [   ](#workflow)
 - [Tools](#tools)
   - [Python](#python-tools)
   - [C#](#c-tools)
@@ -27,7 +27,7 @@ long paths (hundreds of thousands of moves) compactly.
 A typical full pipeline, from an image/shape to a finished merged Hamiltonian cycle:
 
 ```
-1. zirgaGaljumsGen.exe 6 6
+1. serpentinaHC3_6x6.exe 6 6
    → generates 6×6 knight's-tour blocks (cikls4abt6x6.hrz)
 
 2. python cycles_to_gatavie_abt_6x6.py cikls4abt6x6.hrz gatavie_abt_6x6
@@ -61,7 +61,6 @@ A typical full pipeline, from an image/shape to a finished merged Hamiltonian cy
 | `serpentina_hc_v12.py` | Assembles 6×6 (or 16×16) blocks into a larger "sheet" according to an FFseciba layout. Supports open and closed paths and prints progress while searching. |
 | `diagnose_ffseciba.py` | Diagnostic tool: exhaustively checks every block transition in an FFseciba layout. |
 | `png_sensors_to_ffseciba.py` | PNG image → FFseciba.txt. Recognises both a dense rectangle with sensor cut-outs and a thin line/spiral/outline (using thinning, spur pruning and connected-component search). |
-| `ffseciba_txt_to_csv_formulas.py` | Converts FFseciba.txt into a CSV with chained formulas (for convenient editing in Excel/LibreOffice). |
 
 **Required libraries:** `numpy`, `Pillow` (PIL), `scikit-image`, `scipy`.
 

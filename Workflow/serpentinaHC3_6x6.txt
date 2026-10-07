@@ -1,0 +1,65 @@
+cd C:\Users\svern\source\repos\serpentinaHC3_6x6\bin\Debug
+
+ar go.bat sagjeneree ciklus (un celju, ja tos vajag)
+gos.bat domaats, lai aptureetu go.bat, bet reizeem nenostraadaa, tad aptureeeshanai vajag izmainiit veeertiibu failaa stopSignals.txt
+ar go4abt.bat veido tos sapleestos failus.
+
+python cycles_to_gatavie_abt_6x6.py cikls4abt6x6.hrz gatavie_abt_6x6	//izveidos *.abt failus
+python cycles_to_gatavie_abt_6x6.py cikls4abt6x6.hrz gatavie_abt_6x6 --saglabat-starpposmu		// izveidos starpdatus, ja nu vajag diagnostiku tiem failiem
+
+png_sensors_to_ffseciba.py - no *.png faila izveido FFseciba.txt, kas noteiks seciibu kaadaa salix blokus.
+python png_sensors_to_ffseciba.py %1 %2 (peec nokluseejuma %1 %2 ir attieciigi testaVirsma.png un FFseciba.txt)
+python png_sensors_to_ffseciba.py astotnieksDIAG.png astotnieksDIAGseciba.txt
+python png_sensors_to_ffseciba.py testaVirsma2.png testaVirsma2seciba.txt
+python png_sensors_to_ffseciba.py virsma3.png virsma3.txt
+
+serpentina_hc_v12.py - izmanto FFseciba.txt un saliek virzienu rindu, kas atbilst *.png atteela Hamiltona ciklam!
+python serpentina_hc_v12.py gatavie_abt_6x6 - shaadi toch straadaa, noraadot abt apakhsDirektorijas vaardu!
+python serpentina_hc_v12.py gatavie_abt_6x6 zirneklis_FFseciba.txt		// ARII straadaa!!!! Nav nepiecieshamiibas datus kopeet uz FFseciba.txt
+python serpentina_hc_v12.py gatavie_abt_6x6 testaVirsmaSpiraleSeciba.txt (priexh testaVirsmaSpiraleSecibaB.hrz x=1, y=8, rutIzm=15)
+python serpentina_hc_v12.py gatavie_abt_6x6 testaVirsma2BezSpiralSeciba.txt (x=1, y=-494, =15)
+python serpentina_hc_v12.py gatavie_abt_6x6 FburtaSeciba.txt
+python serpentina_hc_v12.py gatavie_abt_6x6 FburtaSeciba+.txt
+python serpentina_hc_v12.py gatavie_abt_6x6 prove4c#.txt
+
+Ar diagnose_ffseciba.py meegjina diagnosticeet konkreetaas formas NEIZVEIDOSSHSNAS iemeslu!
+
+
+
+
+
+
+
+Paarbaudiiju Tavus "pleesumus" un tie nav pareizi! Es k-kaa akli paljaavos, ka esi sapratis to HC sadaliishanu divaas daljaasm, bet nu es vismaz ar sho kljuudu esmu nonaacis pie k-kaadas sisteemas. 
+Ar 6x6 buus tomeer gruutaak, jo maz vietas manevreeshanai, bet NE neiespeejami! Tagad iedoshu Tev piemeeru!
+Taatad mums ir 6x6 laux, kuram liidziiga 16x16 sepereeshana iespeejama starp koordinaateem:
+
+no (1,1) uz (0,3) = 8, 
+no (1,1) uz (3,0) = 3, 
+no (4,1) uz (2,0) = 6, 
+no (4,1) uz (5,3) = 1, 
+no (4,4) uz (5,2) = 3,
+no (4,4) uz (2,5) = 7,
+no (1,4) uz (0,2) = 5 un
+no (1,4) uz (3,5) = 2
+Nu un protams to visu var pagriezt otraadi:
+no (0,3) uz (1,1) = 4, 
+no (3,0) uz (1,1) = 7, 
+no (2,0) uz (4,1) = 2, 
+no (5,3) uz (4,1) = 5, 
+no (5,2) uz (4,4) = 7,
+no (2,5) uz (4,4) = 3,
+no (0,2) uz (1,4) = 1 un
+no (3,5) uz (1,4) = 6
+
+Pirmkaart, "pleestaas" daljas NEVAR saakties 1 vai max-1 kolonnaa vai rindaa, taas var saaakties 0 vai max rindaa vai kolonnaa! Otrkaart, "pleestaas" daljas nevar beigties 0 vai max rindaa vai kolonnaa, taam jaasaakas 1 vai max-1 kolonnaa vai rindaa! Abaaam daljaam ar saiti uz sevi ir jaaveido vismaz hamiltona celjsh
+
+Ceru, ka neesu sajaucis virzienus! 
+Piemeeram 611741631354768131456722167543271457, var sadaliit starp koordinaateem (1,1) un (3,0), un starp (1,1) un (0,3), starp (1,4) un (0,2), starp (1,4) un (3,5), starp (4,1) un (2,0), starp (4,4) un (2,5).
+Iespeejamie daliijumi shim blokam apziimeeti ar zaljajaam bultinjaam uz aarpusi un tad zilaas ir to partneri, kas turpina ienaakshanu uz iekshpusi blokaa!
+Domaaju, ka visa pprobleema ir nepareizajaa sadaliishanaa divaa daljaas! Luudzu izlabo to *.abt failuu gjenereeeshanu!
+
+
+Pie mikroScope.html sepereeshanas!
+Buutiibaa ieguutaas divas dljas savieno B+A vienaa rindaa, un NONJEM nost TAGADEEJO pirmo veertiibu!
+Tad arii buus ieguuts pleeesums vajadziigaa vietaa!

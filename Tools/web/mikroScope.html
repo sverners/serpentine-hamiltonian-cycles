@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+    <meta charset="UTF-8">
+    <title>HRZ mikroScope v5 ar BIN Ģenerēšanu</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+        }
+        #sidebar {
+            width: 660px;
+            min-width: 660px;
+            flex-shrink: 0;
+            background-color: #2d2d30;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+            border-right: 1px solid #3e3e42;
+        }
+        #main-content {
+            flex-grow: 1;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #1e1e1e;
+            position: relative;
+        }
+        .group-box {
+            background-color: #3e3e42;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
+        h2 { margin-top: 0; font-size: 15px; color: #fff; margin-bottom: 10px; }
+        input[type="file"], input[type="range"] {
+            width: 100%;
+            margin-top: 5px;
+            margin-bottom: 10px;
+        }
+        input[type="number"] {
+            background: #1e1e1e;
+            color: #fff;
+            border: 1px solid #555;
+            padding: 4px;
+            border-radius: 3px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 8px 12px;
+            margin: 2px;
+            background-color: #007acc;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .btn:hover { background-color: #0098ff; }
+        .btn-red { background-color: #e74c3c; }
+        .btn-red:hover { background-color: #c0392b; }
+        .btn-green { background-color: #27ae60; }
+        .btn-green:hover { background-color: #2ecc71; }
+        .flex-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+        canvas {
+            background-color: #1e1e1e;
+            display: block;
+            cursor: crosshair;
+        }
+        .info-text { font-size: 12px; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <div class="group-box">
+            <h2>1. Ielādēt failu (.hrz, .vrz, .bin)</h2>
+            <input type="file" id="fileInput" accept=".hrz,.vrz,.bin,.txt">
+            <div class="info-text" id="fileInfo">Kopējais gājienu skaits: 0</div>
+            
+            <div class="info-text" style="margin-top:10px;">Uzzīmētie gājieni: <span id="sliderVal">0</span></div>
+            <div class="info-text" id="dimsInfo">Palaga izmērs: 0 × 0 šūnas</div>
+            <input type="range" id="drawSlider" min="0" max="0" value="0">
+        </div>
+
+        <div class="group-box">
+            <h2>2. Skats & Mērogs</h2>
+            <div class="flex-row">
+                <span>Centrs X:</span> <input type="number" id="centerX" value="0" style="width: 70px;" onchange="manualCenter()">
+                <span>Y:</span> <input type="number" id="centerY" value="0" style="width: 70px;" onchange="manualCenter()">
+                <span>Rūtiņas izmērs (px):</span> <input type="number" id="gridSize" value="10" style="width: 60px;" oninput="updateScale()">
+                <button class="btn" onclick="autoCenter()">Auto-Center</button>
+            </div>
+        </div>
+
+        <div class="group-box">
+            <h2>3. Krāsu maiņa un Lūzuma punkts</h2>
+            <div class="flex-row">
+                <span>Krāsu maiņa (pēc gājiena Nr.):</span> 
+                <input type="number" id="colorSwitchIndex" value="0" style="width: 80px;" onchange="calculateAndDraw()">
+                <button class="btn btn-green" onclick="set50Percent()">Set 50%</button>
+                <button class="btn btn-green" onclick="resetColor()">Reset (All Green)</button>
+            </div>
+            <div class="info-text" style="color: #f39c12; margin-top: 5px; margin-bottom: 5px;">
+                💡 Klikšķini uz zīmējuma, lai automātiski ielasītu punkta koordinātes un gājiena numuru!
+            </div>
+            <div class="flex-row">
+                <span>Lūzuma punkta koordinātes:</span> 
+                <span>X:</span> <input type="number" id="splitX" value="0" style="width: 60px;">
+                <span>Y:</span> <input type="number" id="splitY" value="0" style="width: 60px;">
+                <button class="btn btn-green" onclick="findPointByCoords()">Meklēt šīs koordinātes</button>
+            </div>
+            <div class="flex-row" style="margin-top: 10px; background: #2d2d30; padding: 10px; border-radius: 4px;">
+                <span>Sadalošais gājiens Nr.:</span> 
+                <input type="number" id="splitIndexOut" value="0" style="width: 80px;" readonly>
+                <button class="btn btn-green" style="font-weight: bold;" onclick="saveSplitHrz()">💾 Saglabāt kā 2 rindas</button>
+            </div>
+        </div>
+
+        <div class="group-box">
+            <h2>5. Eksports apskatei / koplietošanai</h2>
+            <div class="info-text">Der ekrāna apskatei un koplietošanai (nevis drukāšanai).</div>
+            <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="btn" style="flex: 1; min-width: 140px;" onclick="exportSvg()">💾 Saglabāt .svg</button>
+            </div>
+            <div class="info-text" style="margin-top: 8px; color: #999;">
+                .svg — viegls, atveras jebkurā pārlūkā/Illustrator, bezgalīgi tālummaināms.
+            </div>
+        </div>
+
+        <div class="group-box">
+            <h2>4. Transformācijas (F1-F9)</h2>
+            <button class="btn" onclick="transformData(1)">F1 ↕️</button>
+            <button class="btn" onclick="transformData(2)">F2 ⤿90°</button>
+            <button class="btn" onclick="transformData(3)">F3 ⤿180°</button>
+            <button class="btn" onclick="transformData(4)">F4 ⤿270°</button>
+            <button class="btn" onclick="transformData(5)">F5 ⏪</button>
+            <button class="btn" onclick="transformData(6)">F6 ↔️</button>
+            <button class="btn" onclick="transformData(7)">F7 ⤡</button>
+            <button class="btn" onclick="transformData(8)">F8 ⤢</button>
+            <button class="btn" onclick="transformData(9)">F9 🔄</button>
+            
+            <div style="margin-top: 15px; display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="btn btn-red" style="flex: 1; min-width: 140px;" onclick="restoreOriginal()">Atjaunot Oriģinālu</button>
+                <button class="btn btn-green" style="flex: 1; min-width: 130px; font-weight: bold;" onclick="saveHrz()">💾 Saglabāt .hrz</button>
+                <button class="btn btn-green" style="flex: 1; min-width: 130px; font-weight: bold;" onclick="saveBin()">💾 Saglabāt .bin</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-content">
+        <canvas id="myCanvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('myCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let masterData = [];
+        let originalMasterData = [];
+        let pathCoordinates = []; 
+        
+        let drawCount = 0;
+        let scale = 10;
+        let isAutoCenter = true;
+        let currentDrawOffsetX = 0;
+        let currentDrawOffsetY = 0;
+        
+        const moves = {
+            1: {dx: 1, dy: -2}, 2: {dx: 2, dy: -1}, 3: {dx: 2, dy: 1}, 4: {dx: 1, dy: 2},
+            5: {dx: -1, dy: 2}, 6: {dx: -2, dy: 1}, 7: {dx: -2, dy: -1}, 8: {dx: -1, dy: -2}
+        };
+
+
+        const fileInput = document.getElementById('fileInput');
+        const drawSlider = document.getElementById('drawSlider');
+        const sliderVal = document.getElementById('sliderVal');
+        const fileInfo = document.getElementById('fileInfo');
+
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const fileName = file.name.toLowerCase();
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                if (fileName.endsWith('.bin')) {
+                    const bytes = new Uint8Array(e.target.result);
+                    masterData = [];
+                    for (let i = 0; i < bytes.length; i += 3) {
+                        if (i + 2 < bytes.length) {
+                            let val = (bytes[i] << 16) | (bytes[i+1] << 8) | bytes[i+2];
+                            
+                            for (let j = 7; j >= 0; j--) {
+                                let bits = (val >> (j * 3)) & 0b111;
+                                masterData.push(bits === 0 ? 8 : bits);
+                            }
+                        }
+                    }
+                    
+                    // EOF Kļūdas/Marķiera filtrs .bin failiem
+                    for (let i = 1; i < masterData.length; i++) {
+                        let prev = masterData[i-1];
+                        let curr = masterData[i];
+                        let opposite = prev > 4 ? prev - 4 : prev + 4;
+                        
+                        if (curr === opposite) {
+                            masterData = masterData.slice(0, i);
+                            break;
+                        }
+                    }
+
+                } else {
+                    const text = e.target.result;
+                    masterData = text.replace(/[^1-8]/g, '').split('').map(Number);
+                }
+                
+                originalMasterData = [...masterData];
+                drawSlider.max = masterData.length;
+                drawSlider.value = masterData.length;
+                drawCount = masterData.length;
+                
+                fileInfo.innerText = "Kopējais gājienu skaits: " + masterData.length;
+                sliderVal.innerText = drawCount;
+                
+                isAutoCenter = true;
+                calculateAndDraw();
+            };
+            
+            if (fileName.endsWith('.bin')) {
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.readAsText(file);
+            }
+        });
+
+        drawSlider.addEventListener('input', function() {
+            drawCount = parseInt(this.value);
+            sliderVal.innerText = drawCount;
+            calculateAndDraw();
+        });
+
+        function updateScale() {
+            scale = parseInt(document.getElementById('gridSize').value) || 10;
+            calculateAndDraw();
+        }
+
+        function manualCenter() {
+            isAutoCenter = false;
+            calculateAndDraw();
+        }
+
+        function autoCenter() {
+            isAutoCenter = true;
+            calculateAndDraw();
+        }
+
+        function set50Percent() {
+            if (drawCount === 0) return;
+            let mid = Math.floor(drawCount / 2);
+            document.getElementById('colorSwitchIndex').value = mid;
+            document.getElementById('splitIndexOut').value = mid;
+            calculateAndDraw();
+        }
+
+        function resetColor() {
+            document.getElementById('colorSwitchIndex').value = 0;
+            calculateAndDraw();
+        }
+
+        function findPointByCoords() {
+            if (pathCoordinates.length === 0) return;
+            const targetX = parseInt(document.getElementById('splitX').value);
+            const targetY = parseInt(document.getElementById('splitY').value);
+            
+            let foundIndex = -1;
+            for (let i = 0; i < pathCoordinates.length; i++) {
+                if (pathCoordinates[i].x === targetX && pathCoordinates[i].y === targetY) {
+                    foundIndex = pathCoordinates[i].index;
+                    break;
+                }
+            }
+            
+            if (foundIndex !== -1) {
+                document.getElementById('splitIndexOut').value = foundIndex;
+                document.getElementById('colorSwitchIndex').value = foundIndex;
+                calculateAndDraw();
+            } else {
+                alert("Šāds punkts maršrutā netika atrasts!");
+            }
+        }
+
+		canvas.addEventListener('mousedown', function(e) {
+			if (masterData.length === 0 || pathCoordinates.length === 0) return;
+			const rect = canvas.getBoundingClientRect();
+			const clickX = e.clientX - rect.left;
+			const clickY = e.clientY - rect.top;
+
+			// Pārvēršam klikšķa pikseļus plaknes (X, Y) koordinātēs (kā daļskaitļus)
+			const wx = (clickX - currentDrawOffsetX) / scale;
+			const wy = (clickY - currentDrawOffsetY) / scale;
+
+			// Meklējam ģeometriski tuvāko virsotni maršrutā
+			let minDistSq = Infinity;
+			let closestIndex = -1;
+			let closestGridX = 0;
+			let closestGridY = 0;
+
+			for (let i = 0; i < pathCoordinates.length; i++) {
+				let dx = pathCoordinates[i].x - wx;
+				let dy = pathCoordinates[i].y - wy;
+				let distSq = dx * dx + dy * dy;
+
+				// Ja atrodam tuvāku punktu, atceramies tā datus
+				if (distSq < minDistSq) {
+					minDistSq = distSq;
+					closestIndex = pathCoordinates[i].index;
+					closestGridX = pathCoordinates[i].x;
+					closestGridY = pathCoordinates[i].y;
+				}
+			}
+
+			// Ja punkts veiksmīgi atrasts, atjaunojam UI un pārzīmējam
+			if (closestIndex !== -1) {
+				document.getElementById('splitX').value = closestGridX;
+				document.getElementById('splitY').value = closestGridY;
+				document.getElementById('splitIndexOut').value = closestIndex;
+				document.getElementById('colorSwitchIndex').value = closestIndex;
+				
+				calculateAndDraw();
+			}
+		});
+
+        function calculateAndDraw() {
+            if (masterData.length === 0) return;
+
+            pathCoordinates = [];
+            let x = 0, y = 0;
+            let minX = 0, maxX = 0, minY = 0, maxY = 0;
+
+            pathCoordinates.push({x: 0, y: 0, index: 0});
+
+            for (let i = 0; i < drawCount; i++) {
+                let m = moves[masterData[i]];
+                if(m) {
+                    x += m.dx;
+                    y += m.dy;
+                    pathCoordinates.push({x: x, y: y, index: i + 1});
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+            }
+
+            // Palaga izmērs ŠŪNĀS (ne pikseļos) - atbilst TIEŠI uzzīmētajai
+            // (drawCount) daļai, tāpēc mainās līdzi slīdnim/transformācijām.
+            const cellsWide = (maxX - minX + 1);
+            const cellsTall = (maxY - minY + 1);
+            document.getElementById('dimsInfo').innerText =
+                "Palaga izmērs: " + cellsWide + " × " + cellsTall + " šūnas";
+
+            const width = (maxX - minX + 4) * scale;
+            const height = (maxY - minY + 4) * scale;
+            
+            canvas.width = Math.max(width, 600);
+            canvas.height = Math.max(height, 600);
+            
+            if (isAutoCenter) {
+                let cx = (maxX + minX) / 2;
+                let cy = (maxY + minY) / 2;
+                document.getElementById('centerX').value = cx;
+                document.getElementById('centerY').value = cy;
+                currentDrawOffsetX = canvas.width / 2 - cx * scale;
+                currentDrawOffsetY = canvas.height / 2 - cy * scale;
+            } else {
+                let cx = parseFloat(document.getElementById('centerX').value) || 0;
+                let cy = parseFloat(document.getElementById('centerY').value) || 0;
+                currentDrawOffsetX = canvas.width / 2 - cx * scale;
+                currentDrawOffsetY = canvas.height / 2 - cy * scale;
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const splitIdx = parseInt(document.getElementById('colorSwitchIndex').value) || 0;
+            
+            ctx.beginPath();
+            let drawX = currentDrawOffsetX;
+            let drawY = currentDrawOffsetY;
+            ctx.moveTo(drawX, drawY);
+            
+            let limit1 = (splitIdx > 0 && splitIdx <= drawCount) ? splitIdx : drawCount;
+            
+            for (let i = 0; i < limit1; i++) {
+                let m = moves[masterData[i]];
+                if(m) {
+                    drawX += m.dx * scale;
+                    drawY += m.dy * scale;
+                    ctx.lineTo(drawX, drawY);
+                }
+            }
+            ctx.strokeStyle = '#00FF00';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            if (limit1 < drawCount) {
+                ctx.beginPath();
+                ctx.moveTo(drawX, drawY);
+                for (let i = limit1; i < drawCount; i++) {
+                    let m = moves[masterData[i]];
+                    if(m) {
+                        drawX += m.dx * scale;
+                        drawY += m.dy * scale;
+                        ctx.lineTo(drawX, drawY);
+                    }
+                }
+                ctx.strokeStyle = '#3498db';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+        }
+
+        function transformData(mode) {
+            if (masterData.length === 0) return;
+            let newData = [];
+            
+            if (mode === 5) {
+                newData = masterData.slice().reverse();
+            } else if (mode === 9) {
+                for (let i = 0; i < masterData.length; i++) {
+                    let d = masterData[i] + 4;
+                    if (d > 8) d -= 8;
+                    newData.push(d);
+                }
+                newData.reverse();
+            } else {
+                for (let i = 0; i < masterData.length; i++) {
+                    let v = masterData[i];
+                    let d = 0;
+                    switch(mode) {
+                        case 1: d = {1:5, 2:4, 3:3, 4:2, 5:1, 6:8, 7:7, 8:6}[v] + 1; break;
+                        case 2: d = v + 2; break;
+                        case 3: d = v + 4; break;
+                        case 4: d = v + 6; break;
+                        case 6: d = {1:1, 2:8, 3:7, 4:6, 5:5, 6:4, 7:3, 8:2}[v] + 1; break;
+                        case 7: d = {1:7, 2:6, 3:5, 4:4, 5:3, 6:2, 7:1, 8:8}[v] + 1; break;
+                        case 8: d = {1:3, 2:2, 3:1, 4:8, 5:7, 6:6, 7:5, 8:4}[v] + 1; break;
+                    }
+                    if (d > 8) d -= 8;
+                    newData.push(d);
+                }
+            }
+            masterData = newData;
+            calculateAndDraw();
+        }
+
+        function restoreOriginal() {
+            if (originalMasterData.length === 0) return;
+            masterData = [...originalMasterData];
+            isAutoCenter = true;
+            calculateAndDraw();
+        }
+
+        function saveHrz() {
+            if (masterData.length === 0) return;
+            const textToSave = masterData.slice(0, drawCount).join('');
+            
+            const blob = new Blob([textToSave], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'transformed_path.hrz';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        }
+
+        function saveBin() {
+            if (masterData.length === 0) return;
+            
+            let dataToSave = masterData.slice(0, drawCount);
+            
+            // Ja gājienu skaits nedalās ar 8, izveidojam tavu EOF marķieri (pretējo virzienu)
+            if (dataToSave.length % 8 !== 0) {
+                let lastMove = dataToSave[dataToSave.length - 1];
+                let oppositeMove = lastMove > 4 ? lastMove - 4 : lastMove + 4;
+                dataToSave.push(oppositeMove);
+            }
+
+            let blocksCount = Math.ceil(dataToSave.length / 8);
+            let buffer = new Uint8Array(blocksCount * 3);
+
+            for (let i = 0; i < blocksCount; i++) {
+                let val = 0;
+                
+                // Nolasām 8 gājienus šim blokam
+                for (let k = 0; k < 8; k++) {
+                    let moveIndex = i * 8 + k;
+                    let move = 8; // Noklusējums trūkstošajiem datiem ir 8 (kas binārajā ir 000)
+                    
+                    if (moveIndex < dataToSave.length) {
+                        move = dataToSave[moveIndex];
+                    }
+                    
+                    let bits = (move === 8) ? 0 : move;
+                    val |= (bits << ((7 - k) * 3));
+                }
+                
+                // Sadalām 24-bitu skaitli 3 baitos (Highest bits first)
+                buffer[i * 3]     = (val >> 16) & 0xFF;
+                buffer[i * 3 + 1] = (val >> 8) & 0xFF;
+                buffer[i * 3 + 2] = val & 0xFF;
+            }
+
+            const blob = new Blob([buffer], { type: 'application/octet-stream' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'transformed_path.bin';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        }
+
+        function exportSvg() {
+            if (pathCoordinates.length === 0) { alert("Vispirms ielādē failu!"); return; }
+
+            let minX = 0, maxX = 0, minY = 0, maxY = 0;
+            for (let i = 0; i < pathCoordinates.length; i++) {
+                const p = pathCoordinates[i];
+                if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+            }
+            const pad = 2;
+            const vbX = minX - pad, vbY = minY - pad;
+            const vbW = (maxX - minX) + pad * 2, vbH = (maxY - minY) + pad * 2;
+
+            const splitIdx = parseInt(document.getElementById('colorSwitchIndex').value) || 0;
+            const limit1 = (splitIdx > 0 && splitIdx <= drawCount) ? splitIdx : drawCount;
+
+            // Būvējam punktu virknes ar masīvu (nevis string +=), jo
+            // ceļos ar simtiem tūkstošu punktu tas ir daudz ātrāk.
+            const pts1 = new Array(limit1 + 1);
+            for (let i = 0; i <= limit1; i++) {
+                pts1[i] = pathCoordinates[i].x + "," + pathCoordinates[i].y;
+            }
+            let polyline2 = "";
+            if (limit1 < drawCount) {
+                const pts2 = new Array(drawCount - limit1 + 1);
+                for (let i = limit1; i <= drawCount; i++) {
+                    pts2[i - limit1] = pathCoordinates[i].x + "," + pathCoordinates[i].y;
+                }
+                polyline2 = '<polyline points="' + pts2.join(' ') + '" fill="none" stroke="#3498db" stroke-width="1.5" vector-effect="non-scaling-stroke"/>\n';
+            }
+
+            // SVARĪGI: svītras biezums ir FIKSĒTS EKRĀNA pikseļos (1.5px,
+            // tieši kā paša skatītāja canvas), nevis pasaules koordinātēs -
+            // to nodrošina "vector-effect: non-scaling-stroke" uz katras
+            // <polyline>. Bez tā, tuvinot (skat. iegulto tuvināšanas
+            // skriptu zemāk), līnijas biezums PIEAUGTU reizē ar tuvinājumu
+            // un drīz pārklātu visu zīmējumu ar vienlaidus plankumu.
+            const strokeW = 1.5;
+
+            // IEGULTS skripts SVG failā pašā - dod peles RITENĪŠA
+            // tuvināšanu/tālināšanu (centrētu zem kursora) un VILKŠANU
+            // (pan), tieši tāpat, kā šajā skatītājā. Tas strādā, kad SVG
+            // fails atvērts TIEŠI pārlūkā (dubultklikšķis vai cilnē) -
+            // NESTRĀDĀ, ja SVG ievietots kā <img> citā lapā vai apskatīts
+            // dažos failu pārvaldniekos, jo tur skripti principā netiek
+            // izpildīti (attēls paliek redzams, tikai bez tālummaiņas).
+            // Noslēguma skripta tegu zemāk JĀRAKSTA ar atpakaļvērsto
+            // slīpsvītru pirms "/script", lai HTML parsētājs ŠAJĀ (ārējā)
+            // failā nesajauktu to ar šī paša faila <script> tega beigām.
+            const interactiveScript =
+                '<script><![CDATA[\n' +
+                '(function(){\n' +
+                '  var svg = document.getElementById("viewer");\n' +
+                '  var vb = {x:' + vbX + ', y:' + vbY + ', w:' + vbW + ', h:' + vbH + '};\n' +
+                '  var orig = {x:' + vbX + ', y:' + vbY + ', w:' + vbW + ', h:' + vbH + '};\n' +
+                '  function apply(){ svg.setAttribute("viewBox", vb.x+" "+vb.y+" "+vb.w+" "+vb.h); }\n' +
+                '  svg.addEventListener("wheel", function(e){\n' +
+                '    e.preventDefault();\n' +
+                '    var rect = svg.getBoundingClientRect();\n' +
+                '    var mx = (e.clientX - rect.left) / rect.width;\n' +
+                '    var my = (e.clientY - rect.top) / rect.height;\n' +
+                '    var sx = vb.x + mx * vb.w, sy = vb.y + my * vb.h;\n' +
+                '    var f = e.deltaY < 0 ? 0.9 : 1.11111111;\n' +
+                '    vb.w *= f; vb.h *= f;\n' +
+                '    vb.x = sx - mx * vb.w; vb.y = sy - my * vb.h;\n' +
+                '    apply();\n' +
+                '  }, {passive:false});\n' +
+                '  var dragging=false,lastX=0,lastY=0;\n' +
+                '  svg.addEventListener("pointerdown", function(e){\n' +
+                '    dragging=true; lastX=e.clientX; lastY=e.clientY;\n' +
+                '    svg.style.cursor="grabbing"; svg.setPointerCapture(e.pointerId);\n' +
+                '  });\n' +
+                '  svg.addEventListener("pointermove", function(e){\n' +
+                '    if(!dragging) return;\n' +
+                '    var rect = svg.getBoundingClientRect();\n' +
+                '    vb.x -= (e.clientX-lastX)*vb.w/rect.width;\n' +
+                '    vb.y -= (e.clientY-lastY)*vb.h/rect.height;\n' +
+                '    lastX=e.clientX; lastY=e.clientY;\n' +
+                '    apply();\n' +
+                '  });\n' +
+                '  svg.addEventListener("pointerup", function(){ dragging=false; svg.style.cursor="grab"; });\n' +
+                '  var zoomedIn = false;\n' +
+                '  svg.addEventListener("dblclick", function(e){\n' +
+                '    if (zoomedIn) {\n' +
+                '      vb = {x:orig.x, y:orig.y, w:orig.w, h:orig.h};\n' +
+                '      zoomedIn = false;\n' +
+                '    } else {\n' +
+                '      var rect = svg.getBoundingClientRect();\n' +
+                '      var mx = (e.clientX - rect.left) / rect.width;\n' +
+                '      var my = (e.clientY - rect.top) / rect.height;\n' +
+                '      var sx = vb.x + mx * vb.w, sy = vb.y + my * vb.h;\n' +
+                '      var newH = 78;\n' +
+                '      var newW = newH * (rect.width / rect.height);\n' +
+                '      vb = {x: sx - mx*newW, y: sy - my*newH, w: newW, h: newH};\n' +
+                '      zoomedIn = true;\n' +
+                '    }\n' +
+                '    apply();\n' +
+                '  });\n' +
+                '  svg.style.cursor = "grab";\n' +
+                '})();\n' +
+                ']]><\/script>\n';
+
+            const svg =
+                '<svg id="viewer" xmlns="http://www.w3.org/2000/svg" viewBox="' + vbX + ' ' + vbY + ' ' + vbW + ' ' + vbH + '">\n' +
+                '<title>Peles ritenis = tuvināt/tālināt; velc = pārvietot; dubultklikšķis = atiestatīt skatu</title>\n' +
+                '<style>svg{width:100%;height:100vh;display:block;background:#1e1e1e}</style>\n' +
+                '<rect x="' + vbX + '" y="' + vbY + '" width="' + vbW + '" height="' + vbH + '" fill="#1e1e1e"/>\n' +
+                '<polyline points="' + pts1.join(' ') + '" fill="none" stroke="#00FF00" stroke-width="' + strokeW + '" vector-effect="non-scaling-stroke"/>\n' +
+                polyline2 +
+                interactiveScript +
+                '</svg>';
+
+            const blob = new Blob([svg], { type: 'image/svg+xml' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'serpentina_palags.svg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        }
+
+        function saveSplitHrz() {
+            if (masterData.length === 0) return;
+            const splitAt = parseInt(document.getElementById('splitIndexOut').value);
+            
+            if (splitAt <= 0 || splitAt >= masterData.length) {
+                alert("Lūdzu, vispirms izvēlies derīgu lūzuma punktu maršruta vidū!");
+                return;
+            }
+            
+            const part1 = masterData.slice(0, splitAt).join('');
+            const part2 = masterData.slice(splitAt).join('');
+            
+            const textToSave = part1 + "\n" + part2;
+            const blob = new Blob([textToSave], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'split_path.hrz';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        }
+    </script>
+</body>
+</html>

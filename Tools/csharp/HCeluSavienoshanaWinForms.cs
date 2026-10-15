@@ -389,7 +389,7 @@ namespace HCeluSavienoshana
             for (int i = 1; i <= 9; i++)
             {
                 int mode = i;
-                var tb = MakeButton(tLabels[i - 1], ColBlue, (s, e) => { data2 = HcLogic.TransformData2(data2, mode); Recalculate(); }, tx, ty, 68);
+                var tb = MakeButton(tLabels[i - 1], ColBlue, (s, e) => ApplyTransform2(mode), tx, ty, 68);
                 g2.Controls.Add(tb);
                 tx += 72;
                 if (i == 5) { tx = 15; ty += 32; }
@@ -434,9 +434,10 @@ namespace HCeluSavienoshana
 
             // ---- 4. Eksports ----
             var g4 = MakeGroup("4. Apvienotā Hamiltona Cikla Eksports", 10, gy, GW, 80);
-            var btnSaveHrz = MakeButton("💾 Saglabāt .HRZ", ColGreen, (s, e) => DoSave("hrz"), 15, 30, 300, 34);
-            var btnSaveBin = MakeButton("💾 Saglabāt .BIN", ColGreen, (s, e) => DoSave("bin"), 325, 30, 300, 34);
-            g4.Controls.AddRange(new Control[] { btnSaveHrz, btnSaveBin });
+            var btnSaveHrz = MakeButton("💾 Saglabāt .HRZ", ColGreen, (s, e) => DoSave("hrz"), 15, 30, 195, 34);
+            var btnSaveBin = MakeButton("💾 Saglabāt .BIN", ColGreen, (s, e) => DoSave("bin"), 220, 30, 195, 34);
+            var btnSaveSvg = MakeButton("💾 Saglabāt .SVG", ColGreen, (s, e) => DoSave("svg"), 425, 30, 195, 34);
+            g4.Controls.AddRange(new Control[] { btnSaveHrz, btnSaveBin, btnSaveSvg });
             gy += g4.Height + 10;
 
             sidebar.Controls.AddRange(new Control[] { g1, g2, g3, g4 });
@@ -512,6 +513,40 @@ namespace HCeluSavienoshana
             Recalculate();
         }
 
+        // Gājienu virknes APGRIEŠANA (F5, F9) maina masīva secību: gājiens ar indeksu j pēc apgriešanas atrodas pozīcijā
+        // n-1-j. Tāpēc lūzuma punkta indekss (izņemtā gājiena pozīcija) jāpārrēķina uz n-1-k, citādi izņemtā mala
+        // pārlēktu uz citu vietu un apgrieztais ceļš nebūtu "pretējais virziens" (tā pati forma, ieeja un izeja
+        // apmainīti vietām). k = 0 (bez lūzuma) un k >= n paliek nemainīti.
+        static int RemapSplitAfterReverse(int n, int k)
+        {
+            return (k > 0 && k < n) ? (n - 1 - k) : k;
+        }
+
+        // 2. objekta transformācija (F1-F9). F5 un F9 apgriež virkni, tāpēc tām atbilstoši jāpārrēķina arī "2. Lūzuma punkts".
+        void ApplyTransform2(int mode)
+        {
+            if (data2.Count == 0) return;
+            int n = data2.Count;
+            var newData = HcLogic.TransformData2(data2, mode);
+            int newSplit = (int)splitIndex2.Value;
+            if (mode == 5 || mode == 9)
+            {
+                int k = (int)splitIndex2.Value;
+                newSplit = RemapSplitAfterReverse(n, k);
+                if (k > 0 && k < n && newSplit == 0)
+                {
+                    // izņemtais gājiens (bijušais pēdējais) kļūtu par PIRMO (indekss 0), ko nevar attēlot (0 = "bez rotācijas").
+                    // 2. ceļš ir slēgts cikls, tāpēc virkni cikliski pagriežam par 1: izņemtais kļūst par pēdējo (n-1),
+                    // un ģeometrija (kura mala izņemta, kurā virzienā ejam) paliek tieši tāda pati.
+                    newData = newData.Skip(1).Concat(newData.Take(1)).ToList();
+                    newSplit = n - 1;
+                }
+            }
+            data2 = newData;                                   // vispirms dati, tad indekss (ValueChanged izsauc Recalculate)
+            splitIndex2.Value = Clamp(splitIndex2, newSplit);
+            Recalculate();
+        }
+
         static decimal Clamp(NumericUpDown nud, decimal v)
         {
             if (v < nud.Minimum) return nud.Minimum;
@@ -519,34 +554,198 @@ namespace HCeluSavienoshana
             return v;
         }
 
+        // SVG eksportē TO, KAS REDZAMS logā (1. ceļš, 2. ceļš, derīgas saites) -
+        // tāpēc tam nav vajadzīgi abi ceļi un nav vajadzīgs derīgs savienojums.
+        void DoSaveSvg()
+        {
+            if (data1.Count == 0 && data2.Count == 0)
+            {
+                MessageBox.Show("Nav ko eksportēt - ielādē vismaz vienu ceļu!", "Trūkst datu", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            using (var dlg = new SaveFileDialog { FileName = "hamilton_cycle.svg", Filter = "SVG faili (*.svg)|*.svg" })
+            {
+                if (dlg.ShowDialog() == DialogResult.OK)
+                {
+                    File.WriteAllText(dlg.FileName, BuildSvg(), new System.Text.UTF8Encoding(false));
+                    MessageBox.Show("Saglabāts: " + dlg.FileName, "OK", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+        }
+
+        // Nosaka, ko saglabāt .HRZ/.BIN failā - to, kas ir ielādēts:
+        //   - abi ceļi + derīgas saites -> apvienotais ceļš;
+        //   - tikai viens ceļš           -> tieši šis ceļš (2. ceļam - tāds, kāds
+        //                                   redzams logā, t.i. ar lūzuma punktu);
+        //   - abi ceļi, bet saites nederīgas -> apvienot nevar (nav derīga zirga
+        //                                   gājiena starp tiem), tāpēc ziņojums.
+        List<int> GetExportData(out string problem, out bool isCombined)
+        {
+            problem = null;
+            isCombined = false;
+            if (data1.Count == 0 && data2.Count == 0)
+            {
+                problem = "Nav ko saglabāt - ielādē vismaz vienu ceļu!";
+                return null;
+            }
+            if (data1.Count > 0 && data2.Count > 0)
+            {
+                var combined = BuildCombined();
+                if (combined == null)
+                {
+                    problem = "Nevar apvienot: saites starp objektiem neatbilst leģitīmiem zirga gājieniem!";
+                    return null;
+                }
+                isCombined = true;
+                return combined;
+            }
+            return data1.Count > 0 ? data1 : data2Effective;
+        }
+
         void DoSave(string format)
         {
-            if (data1.Count == 0 || data2.Count == 0)
+            if (format == "svg") { DoSaveSvg(); return; }
+            string problem;
+            bool isCombined;
+            var toSave = GetExportData(out problem, out isCombined);
+            if (toSave == null)
             {
-                MessageBox.Show("Lūdzu, ielādē abus Hamiltona ceļus!", "Trūkst datu", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(problem, "Nevar saglabāt", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-            var combined = BuildCombined();
-            if (combined == null)
-            {
-                MessageBox.Show("Nevar saglabāt: saites starp objektiem neatbilst leģitīmiem zirga gājieniem!",
-                    "Nederīgs savienojums", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-            string ext = format == "hrz" ? "hrz" : "bin";
+            string ext = format;
+            string filter = format == "hrz" ? "HRZ faili (*.hrz)|*.hrz" : "BIN faili (*.bin)|*.bin";
             using (var dlg = new SaveFileDialog
             {
-                FileName = "combined_hamilton_cycle." + ext,
-                Filter = format == "hrz" ? "HRZ faili (*.hrz)|*.hrz" : "BIN faili (*.bin)|*.bin"
+                FileName = (isCombined ? "combined_hamilton_cycle." : "hamilton_cycle.") + ext,
+                Filter = filter
             })
             {
                 if (dlg.ShowDialog() == DialogResult.OK)
                 {
-                    if (format == "hrz") HcLogic.SaveHrz(combined, dlg.FileName);
-                    else HcLogic.SaveBin(combined, dlg.FileName);
+                    if (format == "hrz") HcLogic.SaveHrz(toSave, dlg.FileName);
+                    else HcLogic.SaveBin(toSave, dlg.FileName);
                     MessageBox.Show("Saglabāts: " + dlg.FileName, "OK", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
+        }
+
+        // SVG eksports apvienotajam ceļam. Krāsas kā uz ekrāna: 1. ceļš zaļš,
+        // 2. ceļš dzeltens, abas saites sarkanas. Līnijas biezums ir FIKSĒTS
+        // ekrāna pikseļos (vector-effect: non-scaling-stroke), tāpēc tuvinot
+        // līnijas nesabiezē. Iegultais skripts dod peles ritenīša tuvināšanu,
+        // vilkšanu un dubultklikšķa pārslēgu (78 šūnu augstums <-> pilns skats);
+        // tas strādā, atverot .svg TIEŠI pārlūkā.
+        string BuildSvg()
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            bool has1 = data1.Count > 0, has2 = data2.Count > 0;
+
+            var all = new List<PointF>();
+            if (has1) all.AddRange(pts1);
+            if (has2) all.AddRange(pts2);
+            float minX = all.Min(p => p.X), maxX = all.Max(p => p.X);
+            float minY = all.Min(p => p.Y), maxY = all.Max(p => p.Y);
+            const int pad = 2;
+            float vbX = minX - pad, vbY = minY - pad;
+            float vbW = (maxX - minX) + pad * 2, vbH = (maxY - minY) + pad * 2;
+
+            Func<float, string> f = v => v.ToString("0.##", inv);
+            Func<List<PointF>, string> pointsStr = ps =>
+                string.Join(" ", ps.Select(p => f(p.X) + "," + f(p.Y)));
+
+            var sb = new System.Text.StringBuilder();
+            string vb = f(vbX) + " " + f(vbY) + " " + f(vbW) + " " + f(vbH);
+            sb.Append("<svg id=\"viewer\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"" + vb + "\">\n");
+            sb.Append("<title>Peles ritenis = tuvināt/tālināt; velc = pārvietot; dubultklikšķis = tuvināt/atgriezt pilnu skatu</title>\n");
+            sb.Append("<style>svg{width:100%;height:100vh;display:block;background:#1e1e1e}</style>\n");
+            sb.Append("<rect x=\"" + f(vbX) + "\" y=\"" + f(vbY) + "\" width=\"" + f(vbW) + "\" height=\"" + f(vbH) + "\" fill=\"#1e1e1e\"/>\n");
+
+            // 1. ceļš (zaļš) un 2. ceļš (dzeltens) - tieši tādi, kādi redzami logā
+            if (has1)
+                sb.Append("<polyline fill=\"none\" stroke=\"#00FF00\" stroke-width=\"1.5\" vector-effect=\"non-scaling-stroke\" points=\"" + pointsStr(pts1) + "\"/>\n");
+            if (has2)
+                sb.Append("<polyline fill=\"none\" stroke=\"#f1c40f\" stroke-width=\"1.5\" vector-effect=\"non-scaling-stroke\" points=\"" + pointsStr(pts2) + "\"/>\n");
+
+            // saites (sarkanas, punktētas) - tikai ja tās ir derīgas, tāpat kā logā
+            if (has1 && has2)
+            {
+                int split = (int)splitIndex1.Value;
+                if (split >= 0 && split <= data1.Count)
+                {
+                    bool ends = (split == data1.Count || split == 0);
+                    var link = GetObj1Link(ends, split);
+                    var in2 = pts2[0];
+                    var out2 = pts2[pts2.Count - 1];
+                    var l1 = HcLogic.GetKnightMoveDigit(link.outPt.X, link.outPt.Y, in2.X, in2.Y);
+                    var l2 = HcLogic.GetKnightMoveDigit(out2.X, out2.Y, link.inReturnPt.X, link.inReturnPt.Y);
+                    if (l1.HasValue && l2.HasValue)
+                    {
+                        sb.Append("<polyline fill=\"none\" stroke=\"#e74c3c\" stroke-width=\"2\" stroke-dasharray=\"4 4\" vector-effect=\"non-scaling-stroke\" points=\"" +
+                                  pointsStr(new List<PointF> { link.outPt, in2 }) + "\"/>\n");
+                        sb.Append("<polyline fill=\"none\" stroke=\"#e74c3c\" stroke-width=\"2\" stroke-dasharray=\"4 4\" vector-effect=\"non-scaling-stroke\" points=\"" +
+                                  pointsStr(new List<PointF> { out2, link.inReturnPt }) + "\"/>\n");
+                    }
+                }
+            }
+
+            string script = @"<script><![CDATA[
+(function(){
+  var svg = document.getElementById('viewer');
+  var vb = {x:@X, y:@Y, w:@W, h:@H};
+  var orig = {x:@X, y:@Y, w:@W, h:@H};
+  function apply(){ svg.setAttribute('viewBox', vb.x+' '+vb.y+' '+vb.w+' '+vb.h); }
+  svg.addEventListener('wheel', function(e){
+    e.preventDefault();
+    var rect = svg.getBoundingClientRect();
+    var mx = (e.clientX - rect.left) / rect.width;
+    var my = (e.clientY - rect.top) / rect.height;
+    var sx = vb.x + mx * vb.w, sy = vb.y + my * vb.h;
+    var f = e.deltaY < 0 ? 0.9 : 1.11111111;
+    vb.w *= f; vb.h *= f;
+    vb.x = sx - mx * vb.w; vb.y = sy - my * vb.h;
+    apply();
+  }, {passive:false});
+  var dragging=false,lastX=0,lastY=0;
+  svg.addEventListener('pointerdown', function(e){
+    dragging=true; lastX=e.clientX; lastY=e.clientY;
+    svg.style.cursor='grabbing'; svg.setPointerCapture(e.pointerId);
+  });
+  svg.addEventListener('pointermove', function(e){
+    if(!dragging) return;
+    var rect = svg.getBoundingClientRect();
+    vb.x -= (e.clientX-lastX)*vb.w/rect.width;
+    vb.y -= (e.clientY-lastY)*vb.h/rect.height;
+    lastX=e.clientX; lastY=e.clientY;
+    apply();
+  });
+  svg.addEventListener('pointerup', function(){ dragging=false; svg.style.cursor='grab'; });
+  var zoomedIn = false;
+  svg.addEventListener('dblclick', function(e){
+    if (zoomedIn) {
+      vb = {x:orig.x, y:orig.y, w:orig.w, h:orig.h};
+      zoomedIn = false;
+    } else {
+      var rect = svg.getBoundingClientRect();
+      var mx = (e.clientX - rect.left) / rect.width;
+      var my = (e.clientY - rect.top) / rect.height;
+      var sx = vb.x + mx * vb.w, sy = vb.y + my * vb.h;
+      var newH = 78;
+      var newW = newH * (rect.width / rect.height);
+      vb = {x: sx - mx*newW, y: sy - my*newH, w: newW, h: newH};
+      zoomedIn = true;
+    }
+    apply();
+  });
+  svg.style.cursor = 'grab';
+})();
+]]></script>
+";
+            script = script.Replace("@X", vbX.ToString(inv)).Replace("@Y", vbY.ToString(inv))
+                           .Replace("@W", vbW.ToString(inv)).Replace("@H", vbH.ToString(inv));
+            sb.Append(script);
+            sb.Append("</svg>");
+            return sb.ToString();
         }
 
         // ---------- Aprēķini (identiski calculateAndDraw() / saveCombined() JS) ----------

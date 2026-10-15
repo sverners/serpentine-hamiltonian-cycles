@@ -2,7 +2,7 @@
 <html lang="lv">
 <head>
     <meta charset="UTF-8">
-    <title>HRZ mikroScope v5 ar BIN Ģenerēšanu</title>
+    <title>HRZ mikroScope v6 - skatītājs un ceļu savienotājs</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -67,6 +67,12 @@
         .btn-red:hover { background-color: #c0392b; }
         .btn-green { background-color: #27ae60; }
         .btn-green:hover { background-color: #2ecc71; }
+        .btn-lightblue { background-color: #3498db; }
+        .btn-lightblue:hover { background-color: #5dade2; }
+        .btn-orange { background-color: #d35400; }
+        .btn-orange:hover { background-color: #e67e22; }
+        .btn-step { padding: 4px 6px; margin: 0; min-width: 38px; font-size: 12px; }
+        .stepper { display: inline-flex; align-items: center; gap: 2px; }
         .flex-row {
             display: flex;
             align-items: center;
@@ -74,74 +80,133 @@
             margin-bottom: 8px;
             flex-wrap: wrap;
         }
+        .lbl { display: inline-block; min-width: 130px; }
         canvas {
             background-color: #1e1e1e;
             display: block;
             cursor: crosshair;
         }
         .info-text { font-size: 12px; margin-bottom: 5px; }
+        .hint { color: #f39c12; }
+        #statusBox {
+            padding: 8px 10px;
+            border-radius: 3px;
+            color: #fff;
+            white-space: pre-line;
+            font-size: 13px;
+            margin-bottom: 12px;
+            min-height: 44px;
+            box-sizing: border-box;
+            background-color: #c0392b;
+        }
+        #statusBox.ok { background-color: #27ae60; }
     </style>
 </head>
 <body>
 
     <div id="sidebar">
         <div class="group-box">
-            <h2>1. Ielādēt failu (.hrz, .vrz, .bin)</h2>
+            <h2>1. Pamata ceļš (.hrz, .vrz, .bin) — Zaļš</h2>
             <input type="file" id="fileInput" accept=".hrz,.vrz,.bin,.txt">
             <div class="info-text" id="fileInfo">Kopējais gājienu skaits: 0</div>
-            
+
             <div class="info-text" style="margin-top:10px;">Uzzīmētie gājieni: <span id="sliderVal">0</span></div>
             <div class="info-text" id="dimsInfo">Palaga izmērs: 0 × 0 šūnas</div>
             <input type="range" id="drawSlider" min="0" max="0" value="0">
-        </div>
 
-        <div class="group-box">
-            <h2>2. Skats & Mērogs</h2>
             <div class="flex-row">
-                <span>Centrs X:</span> <input type="number" id="centerX" value="0" style="width: 70px;" onchange="manualCenter()">
-                <span>Y:</span> <input type="number" id="centerY" value="0" style="width: 70px;" onchange="manualCenter()">
-                <span>Rūtiņas izmērs (px):</span> <input type="number" id="gridSize" value="10" style="width: 60px;" oninput="updateScale()">
-                <button class="btn" onclick="autoCenter()">Auto-Center</button>
-            </div>
-        </div>
-
-        <div class="group-box">
-            <h2>3. Krāsu maiņa un Lūzuma punkts</h2>
-            <div class="flex-row">
-                <span>Krāsu maiņa (pēc gājiena Nr.):</span> 
-                <input type="number" id="colorSwitchIndex" value="0" style="width: 80px;" onchange="calculateAndDraw()">
+                <span class="lbl">Lūzuma punkts:</span>
+                <input type="number" id="splitIndex1" value="0" min="0" style="width: 90px;" onchange="calculateAndDraw()">
+                <button class="btn btn-lightblue" onclick="setSplitEnds()">Pievienot galos</button>
                 <button class="btn btn-green" onclick="set50Percent()">Set 50%</button>
-                <button class="btn btn-green" onclick="resetColor()">Reset (All Green)</button>
             </div>
-            <div class="info-text" style="color: #f39c12; margin-top: 5px; margin-bottom: 5px;">
-                💡 Klikšķini uz zīmējuma, lai automātiski ielasītu punkta koordinātes un gājiena numuru!
+            <div class="info-text hint">
+                💡 Ja Lūzuma punkts = Gājienu skaits, 2. ceļš tiek iesprausts starp 1. ceļa beigām un sākumu!
+                Lūzuma punktu var iestatīt arī ar klikšķi uz zīmējuma (zaļais ceļš = 1. ceļa lūzums, dzeltenais = 2. ceļa lūzums).
             </div>
             <div class="flex-row">
-                <span>Lūzuma punkta koordinātes:</span> 
+                <span class="lbl">Lūzuma punkta koordinātes:</span>
                 <span>X:</span> <input type="number" id="splitX" value="0" style="width: 60px;">
                 <span>Y:</span> <input type="number" id="splitY" value="0" style="width: 60px;">
                 <button class="btn btn-green" onclick="findPointByCoords()">Meklēt šīs koordinātes</button>
             </div>
-            <div class="flex-row" style="margin-top: 10px; background: #2d2d30; padding: 10px; border-radius: 4px;">
-                <span>Sadalošais gājiens Nr.:</span> 
-                <input type="number" id="splitIndexOut" value="0" style="width: 80px;" readonly>
-                <button class="btn btn-green" style="font-weight: bold;" onclick="saveSplitHrz()">💾 Saglabāt kā 2 rindas</button>
+            <div class="flex-row">
+                <span class="lbl">Krāsu maiņa (pēc gājiena Nr.):</span>
+                <input type="number" id="colorSwitchIndex" value="0" style="width: 80px;" onchange="calculateAndDraw()">
+                <button class="btn btn-green" onclick="resetColor()">Reset (All Green)</button>
             </div>
         </div>
 
         <div class="group-box">
-            <h2>5. Eksports apskatei / koplietošanai</h2>
-            <div class="info-text">Der ekrāna apskatei un koplietošanai (nevis drukāšanai).</div>
-            <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
-                <button class="btn" style="flex: 1; min-width: 140px;" onclick="exportSvg()">💾 Saglabāt .svg</button>
+            <h2>2. Importēt 2. ceļu (.hrz, .vrz, .bin) — Dzeltens</h2>
+            <input type="file" id="fileInput2" accept=".hrz,.vrz,.bin,.txt">
+            <div class="info-text" id="fileInfo2">Gājienu skaits: 0</div>
+
+            <div class="flex-row">
+                <span class="lbl">2. Ceļa Nobīde X:</span>
+                <input type="number" id="offsetX2" value="0" data-stepper style="width: 70px;" onchange="calculateAndDraw()">
+                <button class="btn btn-orange" onclick="autoAlign()">🧲 Piesaistīt atvērumus</button>
+            </div>
+            <div class="flex-row">
+                <span class="lbl">Y:</span>
+                <input type="number" id="offsetY2" value="0" data-stepper style="width: 70px;" onchange="calculateAndDraw()">
+            </div>
+            <div class="flex-row">
+                <span class="lbl">2. Lūzuma punkts:</span>
+                <input type="number" id="splitIndex2" value="0" min="0" style="width: 90px;" onchange="calculateAndDraw()">
+                <button class="btn btn-lightblue" onclick="resetSplit2()">Bez rotācijas</button>
+                <span id="splitInfo2" style="color: cyan; font-size: 12px;"></span>
+            </div>
+            <div class="info-text" style="margin-top: 10px;">2. Objekta Transformācijas (F1-F9):</div>
+            <div>
+                <button class="btn" onclick="transform2(1)">F1 ↕️</button>
+                <button class="btn" onclick="transform2(2)">F2 ⤿90°</button>
+                <button class="btn" onclick="transform2(3)">F3 ⤿180°</button>
+                <button class="btn" onclick="transform2(4)">F4 ⤿270°</button>
+                <button class="btn" onclick="transform2(5)">F5 ⏪</button>
+                <button class="btn" onclick="transform2(6)">F6 ↔️</button>
+                <button class="btn" onclick="transform2(7)">F7 ⤡</button>
+                <button class="btn" onclick="transform2(8)">F8 ⤢</button>
+                <button class="btn" onclick="transform2(9)">F9 🔄</button>
+                <button class="btn btn-red" onclick="restore2()">Atjaunot 2.</button>
+            </div>
+        </div>
+
+        <div class="group-box">
+            <h2>3. Savienošana &amp; Kontrole</h2>
+            <div id="statusBox">Gaidīšana: ielādē abus ceļus!</div>
+            <div class="flex-row">
+                <span class="lbl">Mērogs (px):</span>
+                <input type="number" id="gridSize" value="10" min="1" max="200" style="width: 60px;" oninput="updateScale()">
+                <button class="btn" onclick="autoCenter()">Auto-Centrs</button>
+            </div>
+            <div class="flex-row">
+                <span class="lbl">Centrs X:</span>
+                <input type="number" id="centerX" value="0" step="any" data-stepper style="width: 70px;" onchange="manualCenter()">
+            </div>
+            <div class="flex-row">
+                <span class="lbl">Y:</span>
+                <input type="number" id="centerY" value="0" step="any" data-stepper style="width: 70px;" onchange="manualCenter()">
+            </div>
+            <div class="info-text" style="color: silver;">Leģenda: ■ Kvadrāts = Ieeja &nbsp;|&nbsp; ● Aplis = Izeja</div>
+            <div class="info-text" id="canvasWarn" style="color: #f39c12; display: none;"></div>
+        </div>
+
+        <div class="group-box">
+            <h2>4. Apvienotā Hamiltona cikla eksports</h2>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button class="btn btn-green" style="flex: 1; min-width: 150px; font-weight: bold;" onclick="saveCombined('hrz')">💾 Saglabāt .HRZ</button>
+                <button class="btn btn-green" style="flex: 1; min-width: 150px; font-weight: bold;" onclick="saveCombined('bin')">💾 Saglabāt .BIN</button>
+                <button class="btn btn-green" style="flex: 1; min-width: 150px; font-weight: bold;" onclick="exportSvg()">💾 Saglabāt .SVG</button>
             </div>
             <div class="info-text" style="margin-top: 8px; color: #999;">
-                .svg — viegls, atveras jebkurā pārlūkā/Illustrator, bezgalīgi tālummaināms.
+                .HRZ / .BIN saglabā apvienoto ceļu (vajadzīgi abi ceļi un derīgas saites).
+                .SVG saglabā to, kas redzams ekrānā (arī ar vienu ceļu): viegls vektora fails ar tālummaiņu (ritenītis), vilkšanu un dubultklikšķi (78 šūnu detalizēts skats).
             </div>
         </div>
 
         <div class="group-box">
-            <h2>4. Transformācijas (F1-F9)</h2>
+            <h2>5. 1. ceļa transformācijas (F1-F9) un saglabāšana</h2>
             <button class="btn" onclick="transformData(1)">F1 ↕️</button>
             <button class="btn" onclick="transformData(2)">F2 ⤿90°</button>
             <button class="btn" onclick="transformData(3)">F3 ⤿180°</button>
@@ -151,11 +216,14 @@
             <button class="btn" onclick="transformData(7)">F7 ⤡</button>
             <button class="btn" onclick="transformData(8)">F8 ⤢</button>
             <button class="btn" onclick="transformData(9)">F9 🔄</button>
-            
+
             <div style="margin-top: 15px; display: flex; gap: 8px; flex-wrap: wrap;">
                 <button class="btn btn-red" style="flex: 1; min-width: 140px;" onclick="restoreOriginal()">Atjaunot Oriģinālu</button>
-                <button class="btn btn-green" style="flex: 1; min-width: 130px; font-weight: bold;" onclick="saveHrz()">💾 Saglabāt .hrz</button>
-                <button class="btn btn-green" style="flex: 1; min-width: 130px; font-weight: bold;" onclick="saveBin()">💾 Saglabāt .bin</button>
+                <button class="btn btn-green" style="flex: 1; min-width: 130px; font-weight: bold;" onclick="saveHrz()">💾 Saglabāt 1. ceļu .hrz</button>
+                <button class="btn btn-green" style="flex: 1; min-width: 130px; font-weight: bold;" onclick="saveBin()">💾 Saglabāt 1. ceļu .bin</button>
+            </div>
+            <div class="flex-row" style="margin-top: 10px; background: #2d2d30; padding: 10px; border-radius: 4px;">
+                <button class="btn btn-green" style="font-weight: bold;" onclick="saveSplitHrz()">💾 Saglabāt kā 2 rindas (pēc 1. ceļa lūzuma punkta)</button>
             </div>
         </div>
     </div>
@@ -165,86 +233,110 @@
     </div>
 
     <script>
-        const canvas = document.getElementById('myCanvas');
+        const $ = id => document.getElementById(id);
+        const canvas = $('myCanvas');
         const ctx = canvas.getContext('2d');
-        
-        let masterData = [];
+
+        // --- stāvoklis ---
+        let masterData = [];            // 1. ceļš (zaļš)
         let originalMasterData = [];
-        let pathCoordinates = []; 
-        
+        let data2 = [];                 // 2. ceļš (dzeltens), kā ielādēts/transformēts
+        let originalData2 = [];
+        let data2Effective = [];        // 2. ceļš pēc lūzuma "sprauga" (izlaists viens gājiens)
+        let pts1Full = [];              // VISAS 1. ceļa virsotnes {x,y,index}
+        let pts1Dirty = true;
+        let pathCoordinates = [];       // 1. ceļa UZZĪMĒTĀ daļa (slīdnis)
+        let pts2 = [];                  // 2. ceļa virsotnes ar nobīdi
+
         let drawCount = 0;
         let scale = 10;
         let isAutoCenter = true;
         let currentDrawOffsetX = 0;
         let currentDrawOffsetY = 0;
-        
+        const MAX_CANVAS = 16000;       // pārlūku kanvasa praktiskais ierobežojums
+
+        // Virzienu konvencija IDENTISKA Program.cs (HcLogic.Moves)
         const moves = {
             1: {dx: 1, dy: -2}, 2: {dx: 2, dy: -1}, 3: {dx: 2, dy: 1}, 4: {dx: 1, dy: 2},
             5: {dx: -1, dy: 2}, 6: {dx: -2, dy: 1}, 7: {dx: -2, dy: -1}, 8: {dx: -1, dy: -2}
         };
 
+        const COL_GREEN = '#00FF00', COL_BLUE = '#3498db', COL_YELLOW = '#f1c40f', COL_RED = '#e74c3c', COL_CYAN = '#00FFFF';
 
-        const fileInput = document.getElementById('fileInput');
-        const drawSlider = document.getElementById('drawSlider');
-        const sliderVal = document.getElementById('sliderVal');
-        const fileInfo = document.getElementById('fileInfo');
+        function intVal(id, def) {
+            const v = parseInt($(id).value);
+            return isNaN(v) ? (def || 0) : v;
+        }
 
-        fileInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            
+        // ---------- ceļa failu lasīšana ----------
+        function parseHrzText(text) {
+            return text.replace(/[^1-8]/g, '').split('').filter(s => s !== '').map(Number);
+        }
+
+        function parseBin(bytes) {
+            let data = [];
+            for (let i = 0; i < bytes.length; i += 3) {
+                if (i + 2 < bytes.length) {
+                    let val = (bytes[i] << 16) | (bytes[i+1] << 8) | bytes[i+2];
+                    for (let j = 7; j >= 0; j--) {
+                        let bits = (val >> (j * 3)) & 0b111;
+                        data.push(bits === 0 ? 8 : bits);
+                    }
+                }
+            }
+            // EOF kļūdas/marķiera filtrs .bin failiem
+            for (let i = 1; i < data.length; i++) {
+                let prev = data[i-1];
+                let curr = data[i];
+                let opposite = prev > 4 ? prev - 4 : prev + 4;
+                if (curr === opposite) { data = data.slice(0, i); break; }
+            }
+            return data;
+        }
+
+        function readPathFile(file, onData) {
             const fileName = file.name.toLowerCase();
             const reader = new FileReader();
-            
             reader.onload = function(e) {
-                if (fileName.endsWith('.bin')) {
-                    const bytes = new Uint8Array(e.target.result);
-                    masterData = [];
-                    for (let i = 0; i < bytes.length; i += 3) {
-                        if (i + 2 < bytes.length) {
-                            let val = (bytes[i] << 16) | (bytes[i+1] << 8) | bytes[i+2];
-                            
-                            for (let j = 7; j >= 0; j--) {
-                                let bits = (val >> (j * 3)) & 0b111;
-                                masterData.push(bits === 0 ? 8 : bits);
-                            }
-                        }
-                    }
-                    
-                    // EOF Kļūdas/Marķiera filtrs .bin failiem
-                    for (let i = 1; i < masterData.length; i++) {
-                        let prev = masterData[i-1];
-                        let curr = masterData[i];
-                        let opposite = prev > 4 ? prev - 4 : prev + 4;
-                        
-                        if (curr === opposite) {
-                            masterData = masterData.slice(0, i);
-                            break;
-                        }
-                    }
+                onData(fileName.endsWith('.bin') ? parseBin(new Uint8Array(e.target.result)) : parseHrzText(e.target.result));
+            };
+            if (fileName.endsWith('.bin')) reader.readAsArrayBuffer(file); else reader.readAsText(file);
+        }
 
-                } else {
-                    const text = e.target.result;
-                    masterData = text.replace(/[^1-8]/g, '').split('').map(Number);
-                }
-                
-                originalMasterData = [...masterData];
+        const drawSlider = $('drawSlider');
+        const sliderVal = $('sliderVal');
+        const fileInfo = $('fileInfo');
+
+        $('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            readPathFile(file, function(data) {
+                masterData = data;
+                originalMasterData = [...data];
+                reversals1 = 0;
+                pts1Dirty = true;
                 drawSlider.max = masterData.length;
                 drawSlider.value = masterData.length;
                 drawCount = masterData.length;
-                
                 fileInfo.innerText = "Kopējais gājienu skaits: " + masterData.length;
                 sliderVal.innerText = drawCount;
-                
+                $('splitIndex1').value = masterData.length;   // noklusējums: "Pievienot galos" (kā Program.cs)
+                $('colorSwitchIndex').value = 0;
                 isAutoCenter = true;
                 calculateAndDraw();
-            };
-            
-            if (fileName.endsWith('.bin')) {
-                reader.readAsArrayBuffer(file);
-            } else {
-                reader.readAsText(file);
-            }
+            });
+        });
+
+        $('fileInput2').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            readPathFile(file, function(data) {
+                data2 = data;
+                originalData2 = [...data];
+                $('fileInfo2').innerText = "Gājienu skaits: " + data2.length;
+                $('splitIndex2').value = 0;
+                calculateAndDraw();
+            });
         });
 
         drawSlider.addEventListener('input', function() {
@@ -253,39 +345,59 @@
             calculateAndDraw();
         });
 
+        // ---------- +/- pogas ap skaitliskajiem lodziņiem (-100, -10, [lodziņš], +10, +100) ----------
+        document.querySelectorAll('input[data-stepper]').forEach(function(inp) {
+            const wrap = document.createElement('span');
+            wrap.className = 'stepper';
+            inp.parentNode.insertBefore(wrap, inp);
+            [['-100', -100], ['-10', -10]].forEach(function(p) { wrap.appendChild(makeStepBtn(inp, p[0], p[1])); });
+            wrap.appendChild(inp);
+            [['+10', 10], ['+100', 100]].forEach(function(p) { wrap.appendChild(makeStepBtn(inp, p[0], p[1])); });
+        });
+
+        function makeStepBtn(inp, text, delta) {
+            const b = document.createElement('button');
+            b.className = 'btn btn-step';
+            b.textContent = text;
+            b.type = 'button';
+            b.addEventListener('click', function() {
+                inp.value = (parseFloat(inp.value) || 0) + delta;
+                inp.dispatchEvent(new Event('change'));   // izsauc to pašu apstrādātāju, kas parastai ievadei
+            });
+            return b;
+        }
+
+        // ---------- skats ----------
         function updateScale() {
-            scale = parseInt(document.getElementById('gridSize').value) || 10;
+            scale = parseInt($('gridSize').value) || 10;
             calculateAndDraw();
         }
+        function manualCenter() { isAutoCenter = false; calculateAndDraw(); }
+        function autoCenter() { isAutoCenter = true; calculateAndDraw(); }
 
-        function manualCenter() {
-            isAutoCenter = false;
-            calculateAndDraw();
-        }
-
-        function autoCenter() {
-            isAutoCenter = true;
+        // ---------- 1. ceļa lūzuma punkts ----------
+        function setSplitEnds() {
+            $('splitIndex1').value = masterData.length;
             calculateAndDraw();
         }
 
         function set50Percent() {
-            if (drawCount === 0) return;
-            let mid = Math.floor(drawCount / 2);
-            document.getElementById('colorSwitchIndex').value = mid;
-            document.getElementById('splitIndexOut').value = mid;
+            if (masterData.length === 0) return;
+            const mid = Math.floor(masterData.length / 2);
+            $('splitIndex1').value = mid;
+            $('colorSwitchIndex').value = mid;
             calculateAndDraw();
         }
 
         function resetColor() {
-            document.getElementById('colorSwitchIndex').value = 0;
+            $('colorSwitchIndex').value = 0;
             calculateAndDraw();
         }
 
         function findPointByCoords() {
             if (pathCoordinates.length === 0) return;
-            const targetX = parseInt(document.getElementById('splitX').value);
-            const targetY = parseInt(document.getElementById('splitY').value);
-            
+            const targetX = parseInt($('splitX').value);
+            const targetY = parseInt($('splitY').value);
             let foundIndex = -1;
             for (let i = 0; i < pathCoordinates.length; i++) {
                 if (pathCoordinates[i].x === targetX && pathCoordinates[i].y === targetY) {
@@ -293,297 +405,570 @@
                     break;
                 }
             }
-            
             if (foundIndex !== -1) {
-                document.getElementById('splitIndexOut').value = foundIndex;
-                document.getElementById('colorSwitchIndex').value = foundIndex;
+                $('splitIndex1').value = (foundIndex === 0 || foundIndex === masterData.length) ? masterData.length : foundIndex;
+                $('colorSwitchIndex').value = foundIndex;
                 calculateAndDraw();
             } else {
                 alert("Šāds punkts maršrutā netika atrasts!");
             }
         }
 
-		canvas.addEventListener('mousedown', function(e) {
-			if (masterData.length === 0 || pathCoordinates.length === 0) return;
-			const rect = canvas.getBoundingClientRect();
-			const clickX = e.clientX - rect.left;
-			const clickY = e.clientY - rect.top;
+        // Gājienu virknes APGRIEŠANA (F5, F9) maina masīva secību: gājiens ar indeksu j pēc apgriešanas atrodas pozīcijā
+        // n-1-j. Tāpēc lūzuma punkta indekss (izņemtā gājiena pozīcija) jāpārrēķina uz n-1-k, citādi izņemtā mala
+        // pārlēktu uz citu vietu un apgrieztais ceļš nebūtu "pretējais virziens" (tā pati forma, ieeja un izeja apmainīti).
+        // k = 0 (bez lūzuma) un k = n ("gali") paliek nemainīti.
+        function remapSplitAfterReverse(n, k) {
+            return (k > 0 && k < n) ? (n - 1 - k) : k;
+        }
 
-			// Pārvēršam klikšķa pikseļus plaknes (X, Y) koordinātēs (kā daļskaitļus)
-			const wx = (clickX - currentDrawOffsetX) / scale;
-			const wy = (clickY - currentDrawOffsetY) / scale;
+        // ---------- 2. ceļš ----------
+        function resetSplit2() { $('splitIndex2').value = 0; calculateAndDraw(); }
 
-			// Meklējam ģeometriski tuvāko virsotni maršrutā
-			let minDistSq = Infinity;
-			let closestIndex = -1;
-			let closestGridX = 0;
-			let closestGridY = 0;
+        function transform2(mode) {
+            if (data2.length === 0) return;
+            const n = data2.length;
+            let newData = transformList(data2, mode);
+            if (mode === 5 || mode === 9) {
+                const k = Math.max(0, intVal('splitIndex2'));
+                let k2 = remapSplitAfterReverse(n, k);
+                if (k > 0 && k < n && k2 === 0) {
+                    // izņemtais gājiens (bijušais pēdējais) kļūtu par PIRMO (indekss 0), ko nevar attēlot (0 = "bez rotācijas").
+                    // 2. ceļš ir slēgts cikls, tāpēc virkni cikliski pagriežam par 1: izņemtais kļūst par pēdējo (n-1),
+                    // un ģeometrija (kura mala izņemta, kurā virzienā ejam) paliek tieši tāda pati.
+                    newData = newData.slice(1).concat(newData.slice(0, 1));
+                    k2 = n - 1;
+                }
+                $('splitIndex2').value = k2;
+            }
+            data2 = newData;
+            calculateAndDraw();
+        }
 
-			for (let i = 0; i < pathCoordinates.length; i++) {
-				let dx = pathCoordinates[i].x - wx;
-				let dy = pathCoordinates[i].y - wy;
-				let distSq = dx * dx + dy * dy;
+        function restore2() {
+            if (originalData2.length === 0) return;
+            data2 = [...originalData2];
+            $('splitIndex2').value = 0;
+            calculateAndDraw();
+        }
 
-				// Ja atrodam tuvāku punktu, atceramies tā datus
-				if (distSq < minDistSq) {
-					minDistSq = distSq;
-					closestIndex = pathCoordinates[i].index;
-					closestGridX = pathCoordinates[i].x;
-					closestGridY = pathCoordinates[i].y;
-				}
-			}
+        // Rada ĪSTU divu-galu "spraugu" 2. ceļā: izlaiž VIENU gājienu pie breakIdx un sāk tieši
+        // PĒC tā (tāpat kā 1. ceļa lūzums izņem vienu malu) - identiski Program.cs RotateAtIndex.
+        function rotateAtIndex(data, breakIdx) {
+            if (breakIdx <= 0 || breakIdx >= data.length) return data;
+            return data.slice(breakIdx + 1).concat(data.slice(0, breakIdx));
+        }
 
-			// Ja punkts veiksmīgi atrasts, atjaunojam UI un pārzīmējam
-			if (closestIndex !== -1) {
-				document.getElementById('splitX').value = closestGridX;
-				document.getElementById('splitY').value = closestGridY;
-				document.getElementById('splitIndexOut').value = closestIndex;
-				document.getElementById('colorSwitchIndex').value = closestIndex;
-				
-				calculateAndDraw();
-			}
-		});
+        // ---------- klikšķis uz zīmējuma: tuvākais punkts ABOS ceļos ----------
+        canvas.addEventListener('mousedown', function(e) {
+            if (masterData.length === 0 && data2.length === 0) return;
+            const rect = canvas.getBoundingClientRect();
+            const wx = (e.clientX - rect.left - currentDrawOffsetX) / scale;
+            const wy = (e.clientY - rect.top - currentDrawOffsetY) / scale;
+
+            let best1 = Infinity, closest1 = -1;
+            for (let i = 0; i < pathCoordinates.length; i++) {
+                const dx = pathCoordinates[i].x - wx, dy = pathCoordinates[i].y - wy;
+                const d = dx * dx + dy * dy;
+                if (d < best1) { best1 = d; closest1 = i; }
+            }
+            let best2 = Infinity, closest2 = -1;
+            for (let i = 0; i < pts2.length; i++) {
+                const dx = pts2[i].x - wx, dy = pts2[i].y - wy;
+                const d = dx * dx + dy * dy;
+                if (d < best2) { best2 = d; closest2 = i; }
+            }
+            if (closest1 === -1 && closest2 === -1) return;
+
+            if (best1 <= best2) {
+                // klikšķis uz ZAĻĀ ceļa = 1. ceļa lūzuma punkts (gali -> "Pievienot galos")
+                $('splitIndex1').value = (closest1 === 0 || closest1 === masterData.length) ? masterData.length : closest1;
+                $('splitX').value = pathCoordinates[closest1].x;
+                $('splitY').value = pathCoordinates[closest1].y;
+                if (data2.length === 0) $('colorSwitchIndex').value = closest1;   // vecā skatītāja uzvedība
+            } else {
+                // klikšķis uz DZELTENĀ ceļa = 2. ceļa lūzuma punkts. pts2 nāk no data2Effective, kas
+                // (ja splitIndex2 != 0) IZLAIŽ vienu gājienu, tāpēc indekss jāpārrēķina atpakaļ uz
+                // oriģinālo data2 (formula pārbaudīta Program.cs): prevSplit==0 -> closest2;
+                // citādi (prevSplit + 1 + closest2) mod N.
+                const prevSplit = Math.max(0, intVal('splitIndex2'));
+                const newIdx = (prevSplit === 0) ? closest2 : (prevSplit + 1 + closest2) % data2.length;
+                $('splitIndex2').value = newIdx;
+            }
+            calculateAndDraw();
+        });
+
+        // ---------- ģeometrija ----------
+        function computePts1() {
+            const arr = new Array(masterData.length + 1);
+            let x = 0, y = 0;
+            arr[0] = {x: 0, y: 0, index: 0};
+            for (let i = 0; i < masterData.length; i++) {
+                const m = moves[masterData[i]];
+                x += m.dx; y += m.dy;
+                arr[i + 1] = {x: x, y: y, index: i + 1};
+            }
+            return arr;
+        }
+
+        function ensurePts1() {
+            if (pts1Dirty) {
+                pts1Full = masterData.length > 0 ? computePts1() : [];
+                pts1Dirty = false;
+            }
+        }
+
+        function knightDigit(a, b) {
+            const dx = Math.round(b.x - a.x), dy = Math.round(b.y - a.y);
+            for (let d = 1; d <= 8; d++) {
+                if (moves[d].dx === dx && moves[d].dy === dy) return d;
+            }
+            return null;
+        }
+
+        // 2. ceļa virsotnes: forma tiek aprēķināta brīvā koordinātu sistēmā, un TĀS ROBEŽLODZIŅA
+        // KREISAIS-AUGŠĒJAIS STŪRIS tiek piesaistīts nobīdei - tā forma nelec, mainot lūzuma punktu.
+        function computePts2() {
+            if (data2.length === 0) { data2Effective = []; pts2 = []; return; }
+            const k = Math.max(0, intVal('splitIndex2'));
+            data2Effective = rotateAtIndex(data2, k);
+            const raw = new Array(data2Effective.length + 1);
+            let x = 0, y = 0, minX = 0, minY = 0;
+            raw[0] = {x: 0, y: 0};
+            for (let i = 0; i < data2Effective.length; i++) {
+                const m = moves[data2Effective[i]];
+                x += m.dx; y += m.dy;
+                raw[i + 1] = {x: x, y: y};
+                if (x < minX) minX = x;
+                if (y < minY) minY = y;
+            }
+            const offX = intVal('offsetX2'), offY = intVal('offsetY2');
+            pts2 = raw.map(p => ({x: p.x - minX + offX, y: p.y - minY + offY}));
+        }
+
+        // Saišu dati starp 1. un 2. ceļu (identiski Program.cs GetObj1Link / UpdateStatus)
+        function getLinkInfo() {
+            if (masterData.length === 0 || data2.length === 0) return null;
+            ensurePts1();
+            const split = intVal('splitIndex1');
+            if (split < 0 || split > masterData.length) return {invalidSplit: true};
+            const ends = (split === masterData.length || split === 0);
+            const out1 = ends ? pts1Full[pts1Full.length - 1] : pts1Full[split];
+            const inRet = ends ? pts1Full[0] : pts1Full[split + 1];
+            const in2 = pts2[0], out2 = pts2[pts2.length - 1];
+            return {
+                split: split, ends: ends, out1: out1, inRet: inRet, in2: in2, out2: out2,
+                link1: knightDigit(out1, in2), link2: knightDigit(out2, inRet)
+            };
+        }
+
+        function buildCombined() {
+            const info = getLinkInfo();
+            if (!info || info.invalidSplit || !info.link1 || !info.link2) return null;
+            let combined = [];
+            if (info.ends) {
+                combined = masterData.concat([info.link1], data2Effective, [info.link2]);
+            } else {
+                combined = masterData.slice(0, info.split).concat([info.link1], data2Effective, [info.link2], masterData.slice(info.split + 1));
+            }
+            return combined;
+        }
+
+        function updateStatus() {
+            const box = $('statusBox');
+            const info = getLinkInfo();
+            if (!info) {
+                box.className = '';
+                box.innerText = "Gaidīšana: ielādē abus ceļus!";
+                return;
+            }
+            if (info.invalidSplit) { box.className = ''; box.innerText = "Nederīgs lūzuma punkts!"; return; }
+            const s1 = info.ends ? "1. Izeja (gals)" : ("1. Lūzums (#" + info.split + ")");
+            const s2 = info.ends ? "1. Ieeja (sākums)" : ("1. Atgriešanās (#" + (info.split + 1) + ")");
+            if (info.link1 && info.link2) {
+                box.className = 'ok';
+                box.innerText = "✅ SAITES IR DERĪGAS!\nSaite 1 (" + s1 + " -> 2. Ieeja): " + info.link1 +
+                                "\nSaite 2 (2. Izeja -> " + s2 + "): " + info.link2;
+            } else {
+                box.className = '';
+                box.innerText = "❌ Nederīgas saites attālums!\nSaite 1 (" + s1 + " -> 2. Ieeja): " +
+                                (info.link1 ? "OK (" + info.link1 + ")" : "Nav zirga gājiens") +
+                                "\nSaite 2 (2. Izeja -> " + s2 + "): " +
+                                (info.link2 ? "OK (" + info.link2 + ")" : "Nav zirga gājiens");
+            }
+        }
+
+        // ---------- zīmēšana ----------
+        function drawMarker(sx, sy, isEntry, color, label, labelOffsetY) {
+            const size = 12;
+            ctx.setLineDash([]);
+            ctx.fillStyle = color;
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 2;
+            if (isEntry) {
+                ctx.fillRect(sx - size / 2, sy - size / 2, size, size);
+                ctx.strokeRect(sx - size / 2, sy - size / 2, size, size);
+            } else {
+                ctx.beginPath();
+                ctx.arc(sx, sy, size / 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            }
+            ctx.font = 'bold 12px Arial';
+            ctx.textBaseline = 'top';
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#000000';
+            const tx = sx + 10, ty = sy + (labelOffsetY === undefined ? -6 : labelOffsetY);
+            ctx.strokeText(label, tx, ty);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillText(label, tx, ty);
+        }
 
         function calculateAndDraw() {
-            if (masterData.length === 0) return;
+            const has1 = masterData.length > 0, has2 = data2.length > 0;
+            ensurePts1();
+            if (drawCount > masterData.length) drawCount = masterData.length;
+            pathCoordinates = has1 ? pts1Full.slice(0, drawCount + 1) : [];
 
-            pathCoordinates = [];
-            let x = 0, y = 0;
-            let minX = 0, maxX = 0, minY = 0, maxY = 0;
+            computePts2();
+            const k2 = Math.max(0, intVal('splitIndex2'));
+            $('splitInfo2').innerText = (has2 && k2 > 0 && k2 < data2.length)
+                ? "✂️ 2. ceļā izveidota sprauga starp #" + k2 + " un #" + (k2 + 1) + " - divi atšķirīgi gali (visas šūnas saglabātas)."
+                : "";
 
-            pathCoordinates.push({x: 0, y: 0, index: 0});
+            updateStatus();
+            if (!has1 && !has2) { $('dimsInfo').innerText = "Palaga izmērs: 0 × 0 šūnas"; return; }
 
-            for (let i = 0; i < drawCount; i++) {
-                let m = moves[masterData[i]];
-                if(m) {
-                    x += m.dx;
-                    y += m.dy;
-                    pathCoordinates.push({x: x, y: y, index: i + 1});
-                    if (x < minX) minX = x;
-                    if (x > maxX) maxX = x;
-                    if (y < minY) minY = y;
-                    if (y > maxY) maxY = y;
+            // kopējais robežlodziņš (uzzīmētā 1. ceļa daļa + 2. ceļš)
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            if (has1) {
+                minX = maxX = 0; minY = maxY = 0;
+                for (let i = 0; i < pathCoordinates.length; i++) {
+                    const p = pathCoordinates[i];
+                    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+                    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+                }
+            }
+            if (has2) {
+                for (let i = 0; i < pts2.length; i++) {
+                    const p = pts2[i];
+                    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+                    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
                 }
             }
 
-            // Palaga izmērs ŠŪNĀS (ne pikseļos) - atbilst TIEŠI uzzīmētajai
-            // (drawCount) daļai, tāpēc mainās līdzi slīdnim/transformācijām.
-            const cellsWide = (maxX - minX + 1);
-            const cellsTall = (maxY - minY + 1);
-            document.getElementById('dimsInfo').innerText =
-                "Palaga izmērs: " + cellsWide + " × " + cellsTall + " šūnas";
+            // Palaga izmērs ŠŪNĀS (uzzīmētais 1. ceļš + 2. ceļš, ja ielādēts)
+            $('dimsInfo').innerText = "Palaga izmērs: " + (maxX - minX + 1) + " × " + (maxY - minY + 1) + " šūnas";
 
             const width = (maxX - minX + 4) * scale;
             const height = (maxY - minY + 4) * scale;
-            
-            canvas.width = Math.max(width, 600);
-            canvas.height = Math.max(height, 600);
-            
+            const warn = $('canvasWarn');
+            if (width > MAX_CANVAS || height > MAX_CANVAS) {
+                warn.style.display = 'block';
+                warn.innerText = "⚠️ Zīmējums (" + Math.round(width) + " × " + Math.round(height) + " px) pārsniedz pārlūka kanvasa ierobežojumu (~" +
+                                 MAX_CANVAS + " px) - samazini mērogu (rūtiņas izmēru) vai tuvini 2. ceļu 1. ceļam!";
+            } else {
+                warn.style.display = 'none';
+            }
+            canvas.width = Math.min(Math.max(width, 600), MAX_CANVAS);
+            canvas.height = Math.min(Math.max(height, 600), MAX_CANVAS);
+
             if (isAutoCenter) {
-                let cx = (maxX + minX) / 2;
-                let cy = (maxY + minY) / 2;
-                document.getElementById('centerX').value = cx;
-                document.getElementById('centerY').value = cy;
+                const cx = (maxX + minX) / 2, cy = (maxY + minY) / 2;
+                $('centerX').value = cx;
+                $('centerY').value = cy;
                 currentDrawOffsetX = canvas.width / 2 - cx * scale;
                 currentDrawOffsetY = canvas.height / 2 - cy * scale;
             } else {
-                let cx = parseFloat(document.getElementById('centerX').value) || 0;
-                let cy = parseFloat(document.getElementById('centerY').value) || 0;
+                const cx = parseFloat($('centerX').value) || 0;
+                const cy = parseFloat($('centerY').value) || 0;
                 currentDrawOffsetX = canvas.width / 2 - cx * scale;
                 currentDrawOffsetY = canvas.height / 2 - cy * scale;
             }
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            const splitIdx = parseInt(document.getElementById('colorSwitchIndex').value) || 0;
-            
-            ctx.beginPath();
-            let drawX = currentDrawOffsetX;
-            let drawY = currentDrawOffsetY;
-            ctx.moveTo(drawX, drawY);
-            
-            let limit1 = (splitIdx > 0 && splitIdx <= drawCount) ? splitIdx : drawCount;
-            
-            for (let i = 0; i < limit1; i++) {
-                let m = moves[masterData[i]];
-                if(m) {
-                    drawX += m.dx * scale;
-                    drawY += m.dy * scale;
-                    ctx.lineTo(drawX, drawY);
+            ctx.setLineDash([]);
+            ctx.lineJoin = 'miter';
+            const ox = currentDrawOffsetX, oy = currentDrawOffsetY;
+            const SX = p => ox + p.x * scale, SY = p => oy + p.y * scale;
+
+            // 1. ceļš (zaļš; pēc "Krāsu maiņa" gājiena - zils)
+            if (has1) {
+                const splitC = intVal('colorSwitchIndex');
+                const limit1 = (splitC > 0 && splitC <= drawCount) ? splitC : drawCount;
+                ctx.beginPath();
+                ctx.moveTo(SX(pathCoordinates[0]), SY(pathCoordinates[0]));
+                for (let i = 1; i <= limit1; i++) ctx.lineTo(SX(pathCoordinates[i]), SY(pathCoordinates[i]));
+                ctx.strokeStyle = COL_GREEN;
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                if (limit1 < drawCount) {
+                    ctx.beginPath();
+                    ctx.moveTo(SX(pathCoordinates[limit1]), SY(pathCoordinates[limit1]));
+                    for (let i = limit1 + 1; i <= drawCount; i++) ctx.lineTo(SX(pathCoordinates[i]), SY(pathCoordinates[i]));
+                    ctx.strokeStyle = COL_BLUE;
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
                 }
             }
-            ctx.strokeStyle = '#00FF00';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
 
-            if (limit1 < drawCount) {
+            // 2. ceļš (dzeltens)
+            if (has2 && pts2.length > 1) {
                 ctx.beginPath();
-                ctx.moveTo(drawX, drawY);
-                for (let i = limit1; i < drawCount; i++) {
-                    let m = moves[masterData[i]];
-                    if(m) {
-                        drawX += m.dx * scale;
-                        drawY += m.dy * scale;
-                        ctx.lineTo(drawX, drawY);
-                    }
-                }
-                ctx.strokeStyle = '#3498db';
+                ctx.moveTo(SX(pts2[0]), SY(pts2[0]));
+                for (let i = 1; i < pts2.length; i++) ctx.lineTo(SX(pts2[i]), SY(pts2[i]));
+                ctx.strokeStyle = COL_YELLOW;
                 ctx.lineWidth = 1.5;
                 ctx.stroke();
             }
+
+            // saites (sarkanas, punktētas - tikai ja derīgas) un lūzuma marķieri
+            const info = getLinkInfo();
+            const full1Drawn = (drawCount === masterData.length);   // 1. ceļa gali/lūzums uzzīmēti tikai pie pilna garuma
+            if (info && !info.invalidSplit) {
+                if (info.link1 && info.link2 && full1Drawn) {
+                    ctx.setLineDash([4, 4]);
+                    ctx.strokeStyle = COL_RED;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(SX(info.out1), SY(info.out1)); ctx.lineTo(SX(info.in2), SY(info.in2));
+                    ctx.moveTo(SX(info.out2), SY(info.out2)); ctx.lineTo(SX(info.inRet), SY(info.inRet));
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+                if (!info.ends && info.split > 0 && info.split < masterData.length && full1Drawn) {
+                    // pie lūzuma DIVI atšķirīgi punkti: izeja (aplis) -> uz 2. Ieeju; atgriešanās ieeja (kvadrāts) <- no 2. Izejas
+                    drawMarker(SX(info.out1), SY(info.out1), false, COL_CYAN, "1. Lūzums-izeja (#" + info.split + ") → uz 2.Ieeju", -20);
+                    drawMarker(SX(info.inRet), SY(info.inRet), true, COL_CYAN, "1. Atgriešanās-ieeja (#" + (info.split + 1) + ") ← no 2.Izejas", 14);
+                }
+            }
+
+            // marķieri 1. ceļam
+            if (has1) {
+                drawMarker(SX(pts1Full[0]), SY(pts1Full[0]), true, COL_GREEN, "1. Ieeja (0)");
+                if (full1Drawn) {
+                    const last = pts1Full[pts1Full.length - 1];
+                    drawMarker(SX(last), SY(last), false, COL_GREEN, "1. Izeja (" + masterData.length + ")");
+                }
+            }
+
+            // marķieri 2. ceļam (ja ieeja un izeja sakrīt - slēgta cilpa - nedaudz izbīdām, lai redzami abi)
+            if (has2 && pts2.length > 0) {
+                const a = pts2[0], b = pts2[pts2.length - 1];
+                const ax = SX(a), ay = SY(a), bx = SX(b), by = SY(b);
+                if ((ax - bx) * (ax - bx) + (ay - by) * (ay - by) < 4) {
+                    drawMarker(ax - 6, ay - 6, true, COL_YELLOW, "2. Ieeja", -20);
+                    drawMarker(bx + 6, by + 6, false, COL_YELLOW, "2. Izeja", 14);
+                } else {
+                    drawMarker(ax, ay, true, COL_YELLOW, "2. Ieeja");
+                    drawMarker(bx, by, false, COL_YELLOW, "2. Izeja");
+                }
+            }
         }
+
+        // ---------- 2. ceļa piesaiste: 2.Ieeja tieši vienu zirga gājienu no 1. ceļa izejas ----------
+        function autoAlign() {
+            if (masterData.length === 0 || data2.length === 0) return;
+            ensurePts1();
+            const split = intVal('splitIndex1');
+            const ends = (split === masterData.length || split === 0);
+            const outPoint = ends ? pts1Full[pts1Full.length - 1] : pts1Full[split];
+            const desired = {x: outPoint.x + 1, y: outPoint.y - 2};
+            // nobīde piesaista formas robežlodziņa stūri, tāpēc jāņem vērā starpība līdz pts2[0]
+            const k = Math.max(0, intVal('splitIndex2'));
+            const eff = rotateAtIndex(data2, k);
+            let x = 0, y = 0, minX = 0, minY = 0;
+            for (let i = 0; i < eff.length; i++) {
+                const m = moves[eff[i]];
+                x += m.dx; y += m.dy;
+                if (x < minX) minX = x;
+                if (y < minY) minY = y;
+            }
+            $('offsetX2').value = desired.x + minX;
+            $('offsetY2').value = desired.y + minY;
+            calculateAndDraw();
+        }
+
+        // ---------- transformācijas ----------
+        const F1 = {1:5, 2:4, 3:3, 4:2, 5:1, 6:8, 7:7, 8:6};
+        const F6 = {1:1, 2:8, 3:7, 4:6, 5:5, 6:4, 7:3, 8:2};
+        const F7 = {1:7, 2:6, 3:5, 4:4, 5:3, 6:2, 7:1, 8:8};
+        const F8 = {1:3, 2:2, 3:1, 4:8, 5:7, 6:6, 7:5, 8:4};
+
+        function transformList(list, mode) {
+            if (list.length === 0) return list;
+            if (mode === 5) return list.slice().reverse();
+            const out = [];
+            for (let i = 0; i < list.length; i++) {
+                const v = list[i];
+                let d = v;
+                switch (mode) {
+                    case 1: d = F1[v] + 1; break;
+                    case 2: d = v + 2; break;
+                    case 3: d = v + 4; break;
+                    case 4: d = v + 6; break;
+                    case 6: d = F6[v] + 1; break;
+                    case 7: d = F7[v] + 1; break;
+                    case 8: d = F8[v] + 1; break;
+                    case 9: d = v + 4; break;
+                }
+                if (d > 8) d -= 8;
+                out.push(d);
+            }
+            if (mode === 9) out.reverse();
+            return out;
+        }
+
+        let reversals1 = 0;   // cik reizes 1. ceļš apgriezts (F5/F9) - lai "Atjaunot Oriģinālu" varētu atgriezt lūzuma punktu
 
         function transformData(mode) {
             if (masterData.length === 0) return;
-            let newData = [];
-            
-            if (mode === 5) {
-                newData = masterData.slice().reverse();
-            } else if (mode === 9) {
-                for (let i = 0; i < masterData.length; i++) {
-                    let d = masterData[i] + 4;
-                    if (d > 8) d -= 8;
-                    newData.push(d);
-                }
-                newData.reverse();
-            } else {
-                for (let i = 0; i < masterData.length; i++) {
-                    let v = masterData[i];
-                    let d = 0;
-                    switch(mode) {
-                        case 1: d = {1:5, 2:4, 3:3, 4:2, 5:1, 6:8, 7:7, 8:6}[v] + 1; break;
-                        case 2: d = v + 2; break;
-                        case 3: d = v + 4; break;
-                        case 4: d = v + 6; break;
-                        case 6: d = {1:1, 2:8, 3:7, 4:6, 5:5, 6:4, 7:3, 8:2}[v] + 1; break;
-                        case 7: d = {1:7, 2:6, 3:5, 4:4, 5:3, 6:2, 7:1, 8:8}[v] + 1; break;
-                        case 8: d = {1:3, 2:2, 3:1, 4:8, 5:7, 6:6, 7:5, 8:4}[v] + 1; break;
-                    }
-                    if (d > 8) d -= 8;
-                    newData.push(d);
-                }
+            if (mode === 5 || mode === 9) {
+                $('splitIndex1').value = remapSplitAfterReverse(masterData.length, Math.max(0, intVal('splitIndex1')));
+                reversals1++;
             }
-            masterData = newData;
+            masterData = transformList(masterData, mode);
+            pts1Dirty = true;
             calculateAndDraw();
         }
 
         function restoreOriginal() {
             if (originalMasterData.length === 0) return;
+            if (reversals1 % 2 === 1) {   // nepāra apgriezienu skaits -> lūzuma indekss jāatgriež
+                $('splitIndex1').value = remapSplitAfterReverse(masterData.length, Math.max(0, intVal('splitIndex1')));
+            }
+            reversals1 = 0;
             masterData = [...originalMasterData];
+            pts1Dirty = true;
             isAutoCenter = true;
             calculateAndDraw();
         }
 
-        function saveHrz() {
-            if (masterData.length === 0) return;
-            const textToSave = masterData.slice(0, drawCount).join('');
-            
-            const blob = new Blob([textToSave], { type: 'text/plain' });
+        // ---------- saglabāšana ----------
+        function downloadBlob(blob, name) {
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = 'transformed_path.hrz';
+            a.download = name;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(a.href);
         }
 
-        function saveBin() {
-            if (masterData.length === 0) return;
-            
-            let dataToSave = masterData.slice(0, drawCount);
-            
-            // Ja gājienu skaits nedalās ar 8, izveidojam tavu EOF marķieri (pretējo virzienu)
+        function packBin(list) {
+            let dataToSave = list.slice();
+            // Ja gājienu skaits nedalās ar 8, izveidojam EOF marķieri (pretējo virzienu)
             if (dataToSave.length % 8 !== 0) {
-                let lastMove = dataToSave[dataToSave.length - 1];
-                let oppositeMove = lastMove > 4 ? lastMove - 4 : lastMove + 4;
-                dataToSave.push(oppositeMove);
+                const lastMove = dataToSave[dataToSave.length - 1];
+                dataToSave.push(lastMove > 4 ? lastMove - 4 : lastMove + 4);
             }
-
-            let blocksCount = Math.ceil(dataToSave.length / 8);
-            let buffer = new Uint8Array(blocksCount * 3);
-
+            const blocksCount = Math.ceil(dataToSave.length / 8);
+            const buffer = new Uint8Array(blocksCount * 3);
             for (let i = 0; i < blocksCount; i++) {
                 let val = 0;
-                
-                // Nolasām 8 gājienus šim blokam
                 for (let k = 0; k < 8; k++) {
-                    let moveIndex = i * 8 + k;
-                    let move = 8; // Noklusējums trūkstošajiem datiem ir 8 (kas binārajā ir 000)
-                    
-                    if (moveIndex < dataToSave.length) {
-                        move = dataToSave[moveIndex];
-                    }
-                    
-                    let bits = (move === 8) ? 0 : move;
+                    const moveIndex = i * 8 + k;
+                    let move = 8;   // trūkstošie dati = 8 (binārajā 000)
+                    if (moveIndex < dataToSave.length) move = dataToSave[moveIndex];
+                    const bits = (move === 8) ? 0 : move;
                     val |= (bits << ((7 - k) * 3));
                 }
-                
-                // Sadalām 24-bitu skaitli 3 baitos (Highest bits first)
                 buffer[i * 3]     = (val >> 16) & 0xFF;
                 buffer[i * 3 + 1] = (val >> 8) & 0xFF;
                 buffer[i * 3 + 2] = val & 0xFF;
             }
-
-            const blob = new Blob([buffer], { type: 'application/octet-stream' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'transformed_path.bin';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(a.href);
+            return buffer;
         }
 
-        function exportSvg() {
-            if (pathCoordinates.length === 0) { alert("Vispirms ielādē failu!"); return; }
+        // 1. ceļa saglabāšana (pēc transformācijām)
+        function saveHrz() {
+            if (masterData.length === 0) return;
+            downloadBlob(new Blob([masterData.slice(0, drawCount).join('')], { type: 'text/plain' }), 'transformed_path.hrz');
+        }
 
-            let minX = 0, maxX = 0, minY = 0, maxY = 0;
-            for (let i = 0; i < pathCoordinates.length; i++) {
-                const p = pathCoordinates[i];
+        function saveBin() {
+            if (masterData.length === 0) return;
+            downloadBlob(new Blob([packBin(masterData.slice(0, drawCount))], { type: 'application/octet-stream' }), 'transformed_path.bin');
+        }
+
+        // Apvienotā ceļa saglabāšana: vajadzīgi abi ceļi un derīgas saites (kā Program.cs)
+        function saveCombined(format) {
+            if (masterData.length === 0 || data2.length === 0) {
+                alert("Lūdzu, ielādē abus Hamiltona ceļus!");
+                return;
+            }
+            const combined = buildCombined();
+            if (!combined) {
+                alert("Nevar saglabāt: saites starp objektiem neatbilst leģitīmiem zirga gājieniem!");
+                return;
+            }
+            if (format === 'hrz') {
+                downloadBlob(new Blob([combined.join('')], { type: 'text/plain' }), 'combined_hamilton_cycle.hrz');
+            } else {
+                downloadBlob(new Blob([packBin(combined)], { type: 'application/octet-stream' }), 'combined_hamilton_cycle.bin');
+            }
+        }
+
+        function saveSplitHrz() {
+            if (masterData.length === 0) return;
+            const splitAt = intVal('splitIndex1');
+            if (splitAt <= 0 || splitAt >= masterData.length) {
+                alert("Lūdzu, vispirms izvēlies derīgu lūzuma punktu maršruta vidū!");
+                return;
+            }
+            const textToSave = masterData.slice(0, splitAt).join('') + "\n" + masterData.slice(splitAt).join('');
+            downloadBlob(new Blob([textToSave], { type: 'text/plain' }), 'split_path.hrz');
+        }
+
+        // SVG eksports: to, kas redzams ekrānā (1. ceļš ar krāsu maiņu, 2. ceļš, derīgas saites)
+        function exportSvg() {
+            const has1 = masterData.length > 0, has2 = data2.length > 0;
+            if (!has1 && !has2) { alert("Nav ko eksportēt - ielādē vismaz vienu ceļu!"); return; }
+
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            const upd = function(p) {
                 if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
                 if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
-            }
+            };
+            if (has1) for (let i = 0; i < pathCoordinates.length; i++) upd(pathCoordinates[i]);
+            if (has2) for (let i = 0; i < pts2.length; i++) upd(pts2[i]);
             const pad = 2;
             const vbX = minX - pad, vbY = minY - pad;
             const vbW = (maxX - minX) + pad * 2, vbH = (maxY - minY) + pad * 2;
 
-            const splitIdx = parseInt(document.getElementById('colorSwitchIndex').value) || 0;
-            const limit1 = (splitIdx > 0 && splitIdx <= drawCount) ? splitIdx : drawCount;
+            const ptStr = p => p.x + "," + p.y;
+            const poly = function(points, color, width, dash) {
+                return '<polyline points="' + points.join(' ') + '" fill="none" stroke="' + color + '" stroke-width="' + width + '"' +
+                       (dash ? ' stroke-dasharray="4 4"' : '') + ' vector-effect="non-scaling-stroke"/>\n';
+            };
 
-            // Būvējam punktu virknes ar masīvu (nevis string +=), jo
-            // ceļos ar simtiem tūkstošu punktu tas ir daudz ātrāk.
-            const pts1 = new Array(limit1 + 1);
-            for (let i = 0; i <= limit1; i++) {
-                pts1[i] = pathCoordinates[i].x + "," + pathCoordinates[i].y;
-            }
-            let polyline2 = "";
-            if (limit1 < drawCount) {
-                const pts2 = new Array(drawCount - limit1 + 1);
-                for (let i = limit1; i <= drawCount; i++) {
-                    pts2[i - limit1] = pathCoordinates[i].x + "," + pathCoordinates[i].y;
+            let body = '';
+            if (has1) {
+                const splitIdx = intVal('colorSwitchIndex');
+                const limit1 = (splitIdx > 0 && splitIdx <= drawCount) ? splitIdx : drawCount;
+                // punktu virknes ar masīvu (nevis string +=) - ļoti gariem ceļiem tas ir daudz ātrāk
+                const pts1s = new Array(limit1 + 1);
+                for (let i = 0; i <= limit1; i++) pts1s[i] = ptStr(pathCoordinates[i]);
+                body += poly(pts1s, COL_GREEN, 1.5, false);
+                if (limit1 < drawCount) {
+                    const pts1b = new Array(drawCount - limit1 + 1);
+                    for (let i = limit1; i <= drawCount; i++) pts1b[i - limit1] = ptStr(pathCoordinates[i]);
+                    body += poly(pts1b, COL_BLUE, 1.5, false);
                 }
-                polyline2 = '<polyline points="' + pts2.join(' ') + '" fill="none" stroke="#3498db" stroke-width="1.5" vector-effect="non-scaling-stroke"/>\n';
+            }
+            if (has2) body += poly(pts2.map(ptStr), COL_YELLOW, 1.5, false);
+
+            const info = getLinkInfo();
+            if (info && !info.invalidSplit && info.link1 && info.link2 && drawCount === masterData.length) {
+                body += poly([ptStr(info.out1), ptStr(info.in2)], COL_RED, 2, true);
+                body += poly([ptStr(info.out2), ptStr(info.inRet)], COL_RED, 2, true);
             }
 
-            // SVARĪGI: svītras biezums ir FIKSĒTS EKRĀNA pikseļos (1.5px,
-            // tieši kā paša skatītāja canvas), nevis pasaules koordinātēs -
-            // to nodrošina "vector-effect: non-scaling-stroke" uz katras
-            // <polyline>. Bez tā, tuvinot (skat. iegulto tuvināšanas
-            // skriptu zemāk), līnijas biezums PIEAUGTU reizē ar tuvinājumu
-            // un drīz pārklātu visu zīmējumu ar vienlaidus plankumu.
-            const strokeW = 1.5;
-
-            // IEGULTS skripts SVG failā pašā - dod peles RITENĪŠA
-            // tuvināšanu/tālināšanu (centrētu zem kursora) un VILKŠANU
-            // (pan), tieši tāpat, kā šajā skatītājā. Tas strādā, kad SVG
-            // fails atvērts TIEŠI pārlūkā (dubultklikšķis vai cilnē) -
-            // NESTRĀDĀ, ja SVG ievietots kā <img> citā lapā vai apskatīts
-            // dažos failu pārvaldniekos, jo tur skripti principā netiek
-            // izpildīti (attēls paliek redzams, tikai bez tālummaiņas).
-            // Noslēguma skripta tegu zemāk JĀRAKSTA ar atpakaļvērsto
-            // slīpsvītru pirms "/script", lai HTML parsētājs ŠAJĀ (ārējā)
-            // failā nesajauktu to ar šī paša faila <script> tega beigām.
+            // IEGULTS skripts SVG failā: ritenīša tuvināšana (zem kursora), vilkšana, dubultklikšķis
+            // (78 šūnu augstuma skats <-> pilns skats). Strādā, atverot .svg TIEŠI pārlūkā.
+            // Noslēguma skripta tegu JĀRAKSTA ar atpakaļvērsto slīpsvītru pirms "/script", lai HTML
+            // parsētājs ŠAJĀ failā nesajauktu to ar šī faila paša <script> tega beigām.
             const interactiveScript =
                 '<script><![CDATA[\n' +
                 '(function(){\n' +
@@ -639,46 +1024,17 @@
 
             const svg =
                 '<svg id="viewer" xmlns="http://www.w3.org/2000/svg" viewBox="' + vbX + ' ' + vbY + ' ' + vbW + ' ' + vbH + '">\n' +
-                '<title>Peles ritenis = tuvināt/tālināt; velc = pārvietot; dubultklikšķis = atiestatīt skatu</title>\n' +
+                '<title>Peles ritenis = tuvināt/tālināt; velc = pārvietot; dubultklikšķis = tuvināt/atgriezt pilnu skatu</title>\n' +
                 '<style>svg{width:100%;height:100vh;display:block;background:#1e1e1e}</style>\n' +
                 '<rect x="' + vbX + '" y="' + vbY + '" width="' + vbW + '" height="' + vbH + '" fill="#1e1e1e"/>\n' +
-                '<polyline points="' + pts1.join(' ') + '" fill="none" stroke="#00FF00" stroke-width="' + strokeW + '" vector-effect="non-scaling-stroke"/>\n' +
-                polyline2 +
+                body +
                 interactiveScript +
                 '</svg>';
 
-            const blob = new Blob([svg], { type: 'image/svg+xml' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'serpentina_palags.svg';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(a.href);
+            downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), 'hamilton_cycle.svg');
         }
 
-        function saveSplitHrz() {
-            if (masterData.length === 0) return;
-            const splitAt = parseInt(document.getElementById('splitIndexOut').value);
-            
-            if (splitAt <= 0 || splitAt >= masterData.length) {
-                alert("Lūdzu, vispirms izvēlies derīgu lūzuma punktu maršruta vidū!");
-                return;
-            }
-            
-            const part1 = masterData.slice(0, splitAt).join('');
-            const part2 = masterData.slice(splitAt).join('');
-            
-            const textToSave = part1 + "\n" + part2;
-            const blob = new Blob([textToSave], { type: 'text/plain' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'split_path.hrz';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(a.href);
-        }
+        updateStatus();
     </script>
 </body>
 </html>

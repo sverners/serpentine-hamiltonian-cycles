@@ -2,7 +2,7 @@
 
 🇱🇻 Latviski: [LasiMani.md](LasiMani.md)
 
-**VCSM** (Vector Chain Spatial Model) is a set of tools for knight's-move
+**VCSM** (Vector Cycling Stitching Method) is a set of tools for knight's-move
 sequences and the **Hamiltonian cycles/paths** built from them. It is aimed at
 prepress, textile and CNC/laser work, where a continuous "serpentine" path that
 visits every cell of a surface exactly once is useful for real physical

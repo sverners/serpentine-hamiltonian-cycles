@@ -31,6 +31,7 @@ namespace PngSensorsToFFseciba
         const int RUN_LENGTH_THRESHOLD = 100; // min. nepārtraukta melna posma garums
         const int DENSE_MIN_THICKNESS = 12;   // melns apgabals, kurā ietilpst 12x12 px kvadrāts, ir BIEZS (aizpildīts), nevis tieva līnija
         const int DENSE_GROW = 5;             // biezās daļas apmale (px), lai neatzīmētu tās malas kā "tievu līniju"
+        const double MIN_RECT_FILL = 0.20;    // "blīvam taisnstūrim" jābūt vismaz tik daļai melnam; citādi tā ir KONTŪRA/RĀMIS, nevis aizpildīta virsma
         const int MIN_LINE_COMPONENT = 60;    // tievās līnijas gabali, kas īsāki par šo (px), tiek uzskatīti par trokšņiem (tikai ja ir biezā daļa)
         const double FILL_MAJORITY = 0.5;    // taisnstūra rūtiņa = "virsma" slieksnis
 
@@ -559,6 +560,24 @@ namespace PngSensorsToFFseciba
             bool[,] blackMask, int width, int height, int step)
         {
             var rectBounds = FindRectangleBounds(blackMask, width, height);
+            RectRejectNote = null;
+            if (rectBounds.HasValue && !LegacyGrid)
+            {
+                // Taisnstūris tiek atrasts pēc garajiem melnajiem posmiem, tāpēc arī TUKŠS RĀMIS vai kontūra (piem. 800x600 rāmis ar
+                // 5 px līniju) izskatās pēc "taisnstūra" - ar milzīgu "sensoru" zonu iekšā. Ja taisnstūra iekšpusē melns ir tikai neliela
+                // daļa, tā nav aizpildīta virsma, bet tieva līnija - apstrādājam kā līniju.
+                var rb0 = rectBounds.Value;
+                long area = (long)(rb0.x1 - rb0.x0 + 1) * (rb0.y1 - rb0.y0 + 1), black = 0;
+                for (int yy = rb0.y0; yy <= rb0.y1; yy++)
+                    for (int xx = rb0.x0; xx <= rb0.x1; xx++)
+                        if (blackMask[yy, xx]) black++;
+                double fill = black / (double)area;
+                if (fill < MIN_RECT_FILL)
+                {
+                    RectRejectNote = $"[DIAG] atrastais \"taisnstūris\" x {rb0.x0}..{rb0.x1}, y {rb0.y0}..{rb0.y1} atmests: iekšpusē melns ir tikai {fill * 100:0.0}% (< {MIN_RECT_FILL * 100:0}%) - tā ir kontūra/rāmis, nevis aizpildīta virsma; apstrādāts kā tieva līnija";
+                    rectBounds = null;
+                }
+            }
 
             var lineMask = (bool[,])blackMask.Clone();
             int rx0 = 0, ry0 = 0, rx1 = 0, ry1 = 0;
@@ -1121,6 +1140,7 @@ namespace PngSensorsToFFseciba
             // vispirms mēģinām, lai ceļa viens gals ir izvēlētā (sākuma) rūtiņa
             var candidates = cells.Where(c => ((c.R + c.C) & 1) == majority)
                                   .OrderBy(c => preferredEnd.HasValue && c.Equals(preferredEnd.Value) ? 0 : 1)
+                                  .ThenBy(c => preferredEnd.HasValue ? Math.Abs(c.R - preferredEnd.Value.R) + Math.Abs(c.C - preferredEnd.Value.C) : 0)   // ja izvēlētā šūna nederēs (krāsa), ņemam tuvāko
                                   .ThenBy(c => Neighbors(c, cells).Count).ThenBy(_ => rng.Next()).ToList();
             foreach (var v in candidates)
             {
@@ -1287,6 +1307,7 @@ namespace PngSensorsToFFseciba
         }
 
         static DetectionInfo LastDetection;
+        static string RectRejectNote;   // paziņojums, ja atrastais "taisnstūris" atmests kā kontūra
 
         // true = vecā uzvedība (pārpalikušie pikseļi pie malas tiek ignorēti, rindu/kolonnu skaits netiek izlīdzināts uz pāra)
         static bool LegacyGrid = false;
@@ -1311,7 +1332,7 @@ namespace PngSensorsToFFseciba
             if (ms - lastReportMs >= 10000)
             {
                 lastReportMs = ms;
-                Console.WriteLine($"[..] meklēju {(closed ? "slēgtu ciklu" : "atvērtu ceļu")}: {ms / 1000} s, soļi {steps:N0}, ceļš {curLen}/{total}, dziļākais sasniegtais {best}/{total}");
+                Console.WriteLine($"[..] meklēju {(closed ? "slēgtu bloku secību" : "atvērtu bloku secību")}: {ms / 1000} s, soļi {steps:N0}, ceļš {curLen}/{total}, dziļākais sasniegtais {best}/{total}");
             }
             return SearchTimeLimitSec > 0 && ms >= SearchTimeLimitSec * 1000.0;
         }
@@ -1368,10 +1389,10 @@ namespace PngSensorsToFFseciba
             int diff = Math.Abs(a.Even - a.Odd);
             var closed = new List<string>();
             if (a.Components > 1) closed.Add($"virsma sadalīta {a.Components} atsevišķos gabalos");
-            if (a.Total % 2 == 1) closed.Add($"rūtiņu skaits ({a.Total}) ir NEPĀRA, bet slēgtam ciklam tam jābūt pāra");
-            else if (diff != 0) closed.Add($"šaha krāsojuma klases nav vienādas (pāra {a.Even}, nepāra {a.Odd}), slēgtam ciklam tām jābūt vienādām");
+            if (a.Total % 2 == 1) closed.Add($"rūtiņu skaits ({a.Total}) ir NEPĀRA, bet slēgtai bloku secībai tam jābūt pāra");
+            else if (diff != 0) closed.Add($"šaha krāsojuma klases nav vienādas (pāra {a.Even}, nepāra {a.Odd}), slēgtai bloku secībai tām jābūt vienādām");
             int low = a.Degree0.Count + a.Degree1.Count;
-            if (low > 0) closed.Add($"{low} rūtiņām ir mazāk nekā 2 kaimiņu (ciklā katrai jābūt vismaz 2)");
+            if (low > 0) closed.Add($"{low} rūtiņām ir mazāk nekā 2 kaimiņu (slēgtā secībā katrai jābūt vismaz 2)");
             a.ClosedImpossibleReason = closed.Count > 0 ? string.Join("; ", closed) : null;
 
             var open = new List<string>();
@@ -1423,6 +1444,30 @@ namespace PngSensorsToFFseciba
             bool ok = IsConnected(surf);
             surf.Add(c);
             return ok;
+        }
+
+        /// <summary>Aizpildītas virsmas "izvirzījumi": rūtiņas ar VIENU kaimiņu, kas pieder BIEZAJAI virsmai (nevis tievai līnijai). Tādi rodas
+        /// no rasterizācijas (piem. šaurs "kakliņš" starp zvaigznes stariem) un NAV īsti līnijas gali. Ar tādu šūnu forma tiek uzskatīta par
+        /// "līniju ar galiem" un krāsu izlīdzināšana tiek izlaista. Tāpēc tādas šūnas atstājam TUKŠAS (tās vēlāk var aizpildīt kā pārējās).
+        /// Sākuma šūna netiek aiztikta. Atgriež noņemto šūnu sarakstu.</summary>
+        static List<Cell> RemoveDenseSpurs(HashSet<Cell> surf, DetectionInfo info, int maxRemovals)
+        {
+            var removed = new List<Cell>();
+            if (info == null || surf.Count == 0) return removed;
+            var startCell = surf.OrderBy(c => c.R).ThenBy(c => c.C).First();
+            for (int i = 0; i < maxRemovals; i++)
+            {
+                Cell? spur = null;
+                foreach (var c in surf.OrderBy(q => q.R).ThenBy(q => q.C))
+                {
+                    if (c.Equals(startCell) || Neighbors(c, surf).Count != 1 || info.LineSurface.Contains(c)) continue;
+                    if (info.RectSurface.Contains(c) || info.ExtraSurface.Contains(c) || info.PadSurface.Contains(c)) { spur = c; break; }
+                }
+                if (spur == null) break;
+                surf.Remove(spur.Value);
+                removed.Add(spur.Value);
+            }
+            return removed;
         }
 
         /// <summary>Attālums (rūtiņās, 4-virzienu) no katras virsmas rūtiņas līdz tuvākajai NE-virsmas rūtiņai
@@ -1510,14 +1555,19 @@ namespace PngSensorsToFFseciba
         /// un cenšas tās izvietot KOPĀ - kā vienu taisnu diagonālu ķēdi (katra pieskaras nākamajai ar stūri). Ja garu
         /// ķēdi droši izvietot nevar, ņem īsākas, bet cieši blakus jau izņemtajām. Sākuma rūtiņa (kreisā augšējā) netiek
         /// noņemta. Katra tukšā šūna ir atsevišķs slēgts bloks, ko vēlāk var aizpildīt ar mazu HC bloku.</summary>
-        static List<Cell> BalanceSurface(HashSet<Cell> surf, SurfaceAnalysis a, out string message)
+        static List<Cell> BalanceSurface(HashSet<Cell> surf, SurfaceAnalysis a, out string message, bool preferClosed = false)
         {
             message = null;
             int diff = Math.Abs(a.Even - a.Odd);
             if (diff == 0) return null;
-            if (a.Components != 1 || a.Degree0.Count + a.Degree1.Count > 0)
+            // ATVĒRTAI bloku secībai pietiek ar krāsu starpību 1 (gala HC tāpat ir vesels), tāpēc tukšas jāatstāj par vienu šūnu mazāk;
+            // ar --slegta-secibu tiek meklēta SLĒGTA secība (starpība 0, vairāk tukšo šūnu)
+            int target = preferClosed ? diff : diff - 1;
+            if (target <= 0) return null;
+            if (a.Degree0.Count + a.Degree1.Count > 0) return null;     // forma ar līnijas galiem: slēgts cikls tāpat nav iespējams, izlīdzināšana nav vajadzīga
+            if (a.Components != 1)
             {
-                message = "[INFO] Šaha krāsojuma izlīdzināšana izlaista: formai ir piespiedu gali vai vairāki gabali (slēgts cikls šai formai tāpat nav iespējams).";
+                message = "[INFO] Šaha krāsojuma izlīdzināšana izlaista: virsma sastāv no vairākiem gabaliem.";
                 return null;
             }
             if (diff > MAX_BALANCE_REMOVALS)
@@ -1529,7 +1579,7 @@ namespace PngSensorsToFFseciba
             int majority = a.Even > a.Odd ? 0 : 1;
             var startCell = surf.OrderBy(c => c.R).ThenBy(c => c.C).First();
             var removed = new List<Cell>();
-            int need = diff;
+            int need = target;
             var chains = new List<List<Cell>>();
             while (need > 0)
             {
@@ -1540,7 +1590,10 @@ namespace PngSensorsToFFseciba
                     for (int minDist = 3; minDist >= 1 && best == null; minDist--)
                     {
                         // ja šī ķēde izlīdzina visu starpību, pārbaudām, ka pa atlikušo virsmu cikls tiešām atrodams
-                        Func<bool> verify = (len == need) ? (Func<bool>)(() => FindHamiltonianCycleByMerging(surf, startCell, 1.5) != null) : null;
+                        Func<bool> verify = (len == need)
+                            ? (preferClosed ? (Func<bool>)(() => FindHamiltonianCycleByMerging(surf, startCell, 1.5) != null)
+                                            : (Func<bool>)(() => FindHamiltonianPathByMerging(surf, 1.5, startCell) != null))
+                            : null;
                         best = FindBestDiagonalChain(surf, degree, dist, majority, len, startCell, removed, minDist, verify);
                     }
                 if (best == null) break;
@@ -1554,7 +1607,7 @@ namespace PngSensorsToFFseciba
                 message = $"[INFO] Šaha krāsojuma starpība {diff} (pāra {a.Even} / nepāra {a.Odd}), bet drošu rūtiņu, ko atstāt tukšu, nav.";
                 return null;
             }
-            message = $"[INFO] Šaha krāsojuma izlīdzināšana: bija pāra {a.Even} / nepāra {a.Odd}; tukšas atstātas {removed.Count} rūtiņas, sabīdītas kopā " +
+            message = $"[INFO] Šaha krāsojuma izlīdzināšana: bija pāra {a.Even} / nepāra {a.Odd}" + (preferClosed ? "" : " (atvērtai bloku secībai pietiek ar starpību 1)") + $"; tukšas atstātas {removed.Count} rūtiņas, sabīdītas kopā " +
                       $"({chains.Count} {(chains.Count == 1 ? "ķēde" : "ķēdes")}): " + string.Join(" | ", chains.Select(ch => string.Join(" ", ch))) +
                       $" (virsma {before} -> {surf.Count}); sākuma rūtiņa {startCell} paliek virsmā." +
                       (need > 0 ? $" Starpība joprojām {need}." : "");
@@ -1582,7 +1635,7 @@ namespace PngSensorsToFFseciba
             string dir = Path.GetDirectoryName(outPath);
             string baseName = Path.GetFileNameWithoutExtension(outPath) + "_starprezultats";
             string basePath = string.IsNullOrEmpty(dir) ? baseName : Path.Combine(dir, baseName);
-            string txtOut = SafeWrite(basePath + ".txt", fp => File.WriteAllText(fp, RenderFFseciba(surf, path), System.Text.Encoding.UTF8));
+            string txtOut = SafeWrite(basePath + ".txt", fp => File.WriteAllText(fp, RenderFFseciba(surf, path), Utf8NoBom));
             string pngOut = basePath + ".png";
 
             var all = new List<Cell>(surf); all.AddRange(sens); all.AddRange(info != null ? info.RemovedSurface : new HashSet<Cell>());
@@ -1590,7 +1643,7 @@ namespace PngSensorsToFFseciba
             const int cs = 12;
             int gridW = (maxC + 1) * cs, gridH = (maxR + 1) * cs;
             int imgW = Math.Max(gridW, 760);
-            string openVerdict = "ATVĒRTS ceļš (gala rezultāts netiek saglabāts). " + VerdictText(a, info != null ? info.RemovedSurface.Count : 0);
+            string openVerdict = "ATVĒRTA bloku secība (S = sākums, G = gals; gala HC no blokiem tāpat būs vesels). " + VerdictText(a, info != null ? info.RemovedSurface.Count : 0);
             int bannerH = BannerHeight(imgW, openVerdict);
             using (var bmp = new Bitmap(imgW, gridH + bannerH))
             using (var g = Graphics.FromImage(bmp))
@@ -1625,7 +1678,7 @@ namespace PngSensorsToFFseciba
             }
             if (info != null && info.RemovedSurface.Count > 0)
                 WriteRedLine("[UZMANĪBU] TUKŠĀS ŠŪNAS, ko vēlāk aizpildīt ar maziem HC blokiem: " + string.Join(" ", info.RemovedSurface));
-            Console.WriteLine($"[STARPREZULTĀTS] saglabāts: {txtOut} (numurēts atvērtais ceļš) un {pngOut} (krāsu gradients zils -> ciāns = ceļa secība; dzeltens gredzens S = sākums {path[0]}, G = gals {path[path.Count - 1]}; balts = aizliegts/sensori" + (info != null && info.RemovedSurface.Count > 0 ? "; sarkans = izņemtās (tukšās) šūnas" : "") + ")");
+            Console.WriteLine($"[STARPREZULTĀTS] saglabāts: {txtOut} (numurēta atvērtā bloku secība) un {pngOut} (krāsu gradients zils -> ciāns = ceļa secība; dzeltens gredzens S = sākums {path[0]}, G = gals {path[path.Count - 1]}; balts = aizliegts/sensori" + (info != null && info.RemovedSurface.Count > 0 ? "; sarkans = izņemtās (tukšās) šūnas" : "") + ")");
         }
 
         /// <summary>Īss slēdziens (kartes virsrakstam): vai slēgts cikls / ceļš pa šūnām ir iespējams.</summary>
@@ -1633,9 +1686,9 @@ namespace PngSensorsToFFseciba
         {
             var sb = new System.Text.StringBuilder();
             sb.Append($"Šaha krāsojums: pāra {a.Even} / nepāra {a.Odd}. ");
-            if (a.ClosedImpossibleReason == null) sb.Append("Slēgts cikls pa šūnām IESPĒJAMS.");
-            else if (a.OpenImpossibleReason == null) sb.Append("Slēgts cikls NEIESPĒJAMS (" + a.ClosedImpossibleReason + "), atvērts ceļš iespējams.");
-            else sb.Append("NEVIENS ceļš nav iespējams: " + a.OpenImpossibleReason + ".");
+            if (a.ClosedImpossibleReason == null) sb.Append("Slēgta bloku secība IESPĒJAMA.");
+            else if (a.OpenImpossibleReason == null) sb.Append("Slēgta bloku secība NEIESPĒJAMA (" + a.ClosedImpossibleReason + "), atvērta secība iespējama - gala HC no blokiem tāpat būs vesels.");
+            else sb.Append("NEVIENA bloku secība nav iespējama: " + a.OpenImpossibleReason + ".");
             if (removedCount > 0) sb.Append($" Izņemtas (tukšas) {removedCount} šūnas.");
             return sb.ToString();
         }
@@ -1690,7 +1743,10 @@ namespace PngSensorsToFFseciba
             if (info != null && info.HaveRect)
                 Console.WriteLine($"[DIAG] atrastais blīvais taisnstūris (px): x {info.Rx0}..{info.Rx1}, y {info.Ry0}..{info.Ry1}  = rūtiņās kolonnas {(info.Rx0 - info.FullX0) / info.Step}..{(info.Rx1 - info.FullX0) / info.Step}, rindas {(info.Ry0 - info.FullY0) / info.Step}..{(info.Ry1 - info.FullY0) / info.Step}");
             else
+            {
+                if (RectRejectNote != null) Console.WriteLine(RectRejectNote);
                 Console.WriteLine("[DIAG] blīvs taisnstūris NAV atrasts (viss uzskatīts par tievu līniju)");
+            }
             Console.WriteLine($"[DIAG] virsmas rūtiņas pēc izcelsmes: taisnstūris {a.RectCount}, biezās daļas ārpus taisnstūra {a.ExtraCount}, tikai tievā līnija {a.LineCount}, abas {a.BothCount}, pievienotās pāra izmēra dēļ {a.PadCount}");
             Console.WriteLine($"[DIAG] šaha krāsojums: pāra (R+C) {a.Even}, nepāra {a.Odd}, starpība {Math.Abs(a.Even - a.Odd)}");
             Console.WriteLine("[DIAG] kaimiņu skaita sadalījums: " + string.Join(", ", a.DegHist.Select(kv => kv.Key + "=>" + kv.Value)));
@@ -1699,8 +1755,8 @@ namespace PngSensorsToFFseciba
                               (a.Degree1.Count > 0 ? " - " + string.Join(" ", a.Degree1.Take(20)) : ""));
             Console.WriteLine($"[DIAG] izolētas rūtiņas (0 kaimiņu): {a.Degree0.Count}" +
                               (a.Degree0.Count > 0 ? " - " + string.Join(" ", a.Degree0.Take(20)) : ""));
-            Console.WriteLine("[DIAG] slēgts cikls: " + (a.ClosedImpossibleReason == null ? "pierādījuma, ka neiespējams, nav" : "PIERĀDĀMI NEIESPĒJAMS - " + a.ClosedImpossibleReason));
-            Console.WriteLine("[DIAG] atvērts ceļš: " + (a.OpenImpossibleReason == null ? "pierādījuma, ka neiespējams, nav" : "PIERĀDĀMI NEIESPĒJAMS - " + a.OpenImpossibleReason));
+            Console.WriteLine("[DIAG] slēgta bloku secība: " + (a.ClosedImpossibleReason == null ? "pierādījuma, ka neiespējama, nav" : "PIERĀDĀMI NEIESPĒJAMA - " + a.ClosedImpossibleReason));
+            Console.WriteLine("[DIAG] atvērta bloku secība: " + (a.OpenImpossibleReason == null ? "pierādījuma, ka neiespējama, nav" : "PIERĀDĀMI NEIESPĒJAMA - " + a.OpenImpossibleReason));
 
             // ---- teksta karte ----
             var sb = new System.Text.StringBuilder();
@@ -1785,6 +1841,10 @@ namespace PngSensorsToFFseciba
             try { Console.ForegroundColor = ConsoleColor.Red; Console.WriteLine(text); }
             finally { Console.ForegroundColor = old; }
         }
+
+        // FFseciba TXT jāraksta UTF-8 BEZ BOM: ar BOM (EF BB BF) pirmais lauks ir "\ufeff6059", ko parasta utf-8 nolasīšana (piem. Python
+        // open(...,encoding='utf-8')) neatpazīst kā skaitli - tad pirmā šūna (0,0) "pazūd" un bloku secībā rodas sprauga.
+        static readonly System.Text.Encoding Utf8NoBom = new System.Text.UTF8Encoding(false);
 
         // ================== DROŠA FAILU RAKSTĪŠANA ==================
         /// <summary>Ieraksta failu; ja tas ir aizņemts (parasti atvērts Excel vai teksta redaktorā, vai to izmanto cits process),
@@ -2304,7 +2364,9 @@ namespace PngSensorsToFFseciba
             //   --laiks=SEK   : laika ierobežojums katram meklēšanas posmam (noklusējums 120, 0 = bez ierobežojuma)
             //   --forse       : meklēt arī tad, ja pierādīts, ka ciklam/ceļam jābūt neiespējamam (aizpildīšanas režīmā: atļaut mazāku .hrz tīklu)
             //   --neizlidzinat: NEizlīdzināt šaha krāsojumu (pēc noklusējuma starpība tiek novērsta, noņemot malas rūtiņas)
-            //   --atlaut-atvertu: atļaut atvērtu ceļu kā GALA rezultātu (pēc noklusējuma atvērts ceļš tiek dots tikai kā starprezultāts)
+            //   --atteikt-atvertu: atteikties no ATVĒRTAS bloku secības (pēc noklusējuma tā tiek pieņemta - gala HC no blokiem tāpat ir vesels)
+            //   --slegta-secibu: meklēt SLĒGTU bloku secību arī tad, ja tam jāatstāj vairāk tukšo šūnu (pēc noklusējuma pietiek ar atvērtu)
+            //   --atlaut-atvertu: (vecs karodziņš, vairs nav vajadzīgs - atvērta secība tiek pieņemta pati)
             //   --aizpildit=CIKLS.hrz : AIZPILDA TUKŠĀS šūnas jau saliktā slēgtā .hrz ciklā (no attēla uzzina, kuras šūnas ir virsma,
             //                   no .hrz - kuras no tām nav apmeklētas; tukšās aizpilda ar atsevišķiem slēgtiem blokiem un saplūdina ar ciklu)
             //   --hrz-izvade=FAILS.hrz : kur saglabāt aizpildīto ciklu (noklusējums: <cikls>_aizpildits.hrz)
@@ -2315,7 +2377,7 @@ namespace PngSensorsToFFseciba
             //   --cikli=FAILS : savs n x n slēgto bloku ciklu katalogs (rinda = viens cikls, n*n cipari); tie tiek izmantoti pirmie
             //   --vecais-tikls: vecā uzvedība - pārpalikušie pikseļi pie malas netiek skaitīti un rindu/kolonnu skaits netiek izlīdzināts uz pāra
             var positional = new List<string>();
-            bool onlyMap = false, force = false, noBalance = false, allowOpen = false;
+            bool onlyMap = false, force = false, noBalance = false, allowOpen = false, rejectOpen = false, preferClosedOrder = false;
             string fillHrz = null, fillOut = null, fillTxt = null, fillEmpty = null, fillCyc = null; int blockSize = 0;   // 0 = noteikt automātiski
             foreach (var a in args)
             {
@@ -2324,6 +2386,8 @@ namespace PngSensorsToFFseciba
                 else if (a == "--vecais-tikls") LegacyGrid = true;
                 else if (a == "--neizlidzinat") noBalance = true;
                 else if (a == "--atlaut-atvertu") allowOpen = true;
+                else if (a == "--atteikt-atvertu") rejectOpen = true;
+                else if (a == "--slegta-secibu") preferClosedOrder = true;
                 else if (a.StartsWith("--aizpildit=")) fillHrz = a.Substring(12);
                 else if (a.StartsWith("--hrz-izvade=")) fillOut = a.Substring(13);
                 else if (a.StartsWith("--bloks=")) { int bs; if (int.TryParse(a.Substring(8), out bs) && bs >= 6 && bs % 2 == 0) blockSize = bs; }
@@ -2347,6 +2411,7 @@ namespace PngSensorsToFFseciba
                 Environment.ExitCode = FillHolesFromTxt(fillTxt, fillEmpty, fillHrz, outH, blockSize, force, fillCyc);
                 return;
             }
+            if (allowOpen) rejectOpen = false;      // --atlaut-atvertu pārraksta --atteikt-atvertu
             string imagePath = positional.Count > 0 ? positional[0] : IMAGE_DEFAULT;
             string outPath = positional.Count > 1 ? positional[1] : OUTPUT_DEFAULT;
 
@@ -2378,8 +2443,15 @@ namespace PngSensorsToFFseciba
             var emptyCells = new List<Cell>();
             if (!noBalance)
             {
+                var spurCells = RemoveDenseSpurs(surfaceCells, LastDetection, 12);
+                if (spurCells.Count > 0)
+                {
+                    foreach (var sc in spurCells) { LastDetection.RemovedSurface.Add(sc); emptyCells.Add(sc); }
+                    diag = AnalyzeSurface(surfaceCells, LastDetection);
+                    Console.WriteLine($"[INFO] Aizpildītās virsmas izvirzījumi (šūnas ar 1 kaimiņu, kas nav līnijas gali) atstāti tukši: {string.Join(" ", spurCells)} (virsma -> {surfaceCells.Count}).");
+                }
                 string balMsg;
-                var removedCells = BalanceSurface(surfaceCells, diag, out balMsg);
+                var removedCells = BalanceSurface(surfaceCells, diag, out balMsg, preferClosedOrder);
                 if (balMsg != null) Console.WriteLine(balMsg);
                 if (removedCells != null && removedCells.Count > 0)
                 {
@@ -2418,22 +2490,22 @@ namespace PngSensorsToFFseciba
             List<Cell> path = null;
             bool closed = true;
             if (diag.ClosedImpossibleReason != null && !force)
-                Console.WriteLine("[INFO] Slēgts cikls PIERĀDĀMI neiespējams (meklēšana izlaista): " + diag.ClosedImpossibleReason);
+                Console.WriteLine("[INFO] Slēgta bloku secība pierādāmi neiespējama (meklēšana izlaista): " + diag.ClosedImpossibleReason);
             else
             {
                 // 1) konstruktīvā metode (2-faktors + ciklu saplūdināšana) - strādā uz aizpildītām formām
                 path = FindHamiltonianCycleByMerging(surfaceCells, start, SearchTimeLimitSec > 0 ? Math.Min(SearchTimeLimitSec, 30) : 30);
                 if (path != null)
-                    Console.WriteLine("[INFO] Slēgts cikls atrasts ar 2-faktora + ciklu saplūdināšanas metodi.");
+                    Console.WriteLine("[INFO] Slēgta bloku secība atrasta ar 2-faktora + ciklu saplūdināšanas metodi.");
                 else
                     path = FindHamiltonianPath(surfaceCells, start, true);
                 if (path == null && LastSearchTimedOut)
-                    Console.WriteLine($"[INFO] Slēgtā cikla meklēšana pārtraukta (laika ierobežojums {SearchTimeLimitSec} s); dziļākais sasniegtais {LastSearchBestDepth}/{surfaceCells.Count}");
+                    Console.WriteLine($"[INFO] Slēgtās bloku secības meklēšana pārtraukta (laika ierobežojums {SearchTimeLimitSec} s); dziļākais sasniegtais {LastSearchBestDepth}/{surfaceCells.Count}");
             }
 
             if (path == null)
             {
-                Console.WriteLine("[INFO] Neizdevās atrast SLĒGTU ciklu - mēģinu ATVĒRTU ceļu.");
+                Console.WriteLine("[INFO] Slēgta bloku secība nav atrasta - mēģinu ATVĒRTU (no tās salikts gala HC tāpat būs vesels).");
                 if (onlyMap)
                 {
                     Console.WriteLine("[INFO] Starpdati saglabāti (--tikai-karte), meklēšanu neturpinu.");
@@ -2441,7 +2513,7 @@ namespace PngSensorsToFFseciba
                 }
                 if (diag.OpenImpossibleReason != null && !force)
                 {
-                    Console.WriteLine("[KĻŪDA] Atvērts Hamiltona ceļš šai virsmai ir PIERĀDĀMI neiespējams: " + diag.OpenImpossibleReason);
+                    Console.WriteLine("[KĻŪDA] Neviena bloku secība šai virsmai nav iespējama (pierādīts): " + diag.OpenImpossibleReason);
                     Console.WriteLine("[KĻŪDA] Meklēšanu neturpinu. Skat. karti (_karte.txt/.png); ja tomēr gribi meklēt, pievieno --forse.");
                     return;
                 }
@@ -2450,7 +2522,7 @@ namespace PngSensorsToFFseciba
                 // 1) konstruktīvā metode nepāra rūtiņu skaitam: cikls uz virsmas bez vienas rūtiņas + šī rūtiņa kā gals
                 path = FindHamiltonianPathByMerging(surfaceCells, SearchTimeLimitSec > 0 ? Math.Min(SearchTimeLimitSec, 30) : 30, start);
                 if (path != null)
-                    Console.WriteLine("[INFO] Atvērts ceļš atrasts ar 2-faktora + ciklu saplūdināšanas metodi (cikls bez vienas rūtiņas + gals).");
+                    Console.WriteLine("[INFO] Atvērta bloku secība atrasta ar 2-faktora + ciklu saplūdināšanas metodi (cikls bez vienas rūtiņas + gals).");
                 else
                     path = FindHamiltonianPath(surfaceCells, start, false);
                 if (path == null && LastSearchTimedOut)
@@ -2474,26 +2546,37 @@ namespace PngSensorsToFFseciba
 
             if (path == null)
             {
-                Console.WriteLine("[KĻŪDA] Neizdevās atrast derīgu Hamiltona ceļu/ciklu šai virsmai (iespējams, sensori/forma sadala virsmu tā, ka tas ir patiešām neiespējami).");
+                Console.WriteLine("[KĻŪDA] Neizdevās atrast derīgu bloku secību šai virsmai (iespējams, sensori/forma sadala virsmu tā, ka tas ir patiešām neiespējami).");
                 return;
             }
 
             string bad = VerifyPath(surfaceCells, path, closed);
             if (bad != null) { Console.WriteLine("[KĻŪDA] Atrastā ceļa kontrole neizdevās: " + bad); return; }
-            Console.WriteLine($"[OK] Atrasts {(closed ? "SLĒGTS cikls" : "ATVĒRTS ceļš")} ({path.Count}/{surfaceCells.Count} rūtiņas), kontrole veiksmīga.");
+            Console.WriteLine($"[OK] Atrasta {(closed ? "SLĒGTA" : "ATVĒRTA")} bloku secība ({path.Count}/{surfaceCells.Count} rūtiņas), kontrole veiksmīga.");
 
-            if (!closed && !allowOpen)
+            // ATVĒRTA bloku secība (sākums + gals, piem. kā burtam S) ir pilnvērtīgs rezultāts: katrs bloks ir slēgts HC, un no savienotiem blokiem
+            // gala HC tāpat ir vesels. Tāpēc atvērtu secību pieņemam jebkurai formai. (Stingrajā režīmā --atteikt-atvertu to noraida.)
+            bool forcedEnds = diag.Degree1.Count > 0;
+            if (!closed)
             {
-                // ATVĒRTS ceļš netiek pieņemts kā gala rezultāts - saglabājam starprezultātu, lai var izdarīt korekcijas
-                Console.WriteLine("[INFO] Atrasts tikai ATVĒRTS ceļš - tas netiek pieņemts kā gala rezultāts, tāpēc " + outPath + " NETIEK saglabāts.");
-                Console.WriteLine("[INFO] Kāpēc slēgts cikls nav atrasts: " + (diag.ClosedImpossibleReason ?? "slēgtā cikla meklēšana neizdevās (pierādījuma, ka tas neiespējams, nav)"));
+                if (forcedEnds)
+                    Console.WriteLine($"[INFO] Bloku secība ir ATVĒRTA: formai ir {diag.Degree1.Count} līnijas gali ({string.Join(" ", diag.Degree1.Take(6))}{(diag.Degree1.Count > 6 ? " ..." : "")}); gala HC no blokiem tāpat būs vesels slēgts cikls.");
+                else
+                    Console.WriteLine($"[INFO] Bloku secība ir ATVĒRTA (sākums {path[0]}, gals {path[path.Count - 1]}): šaha krāsojuma starpība neļauj slēgtu secību; gala HC no blokiem tāpat būs vesels slēgts cikls.");
+            }
+            if (!closed && rejectOpen)
+            {
+                Console.WriteLine("[INFO] Atvērta bloku secība netiek pieņemta (--atteikt-atvertu), tāpēc " + outPath + " NETIEK saglabāts.");
+                Console.WriteLine("[INFO] Kāpēc slēgta bloku secība nav atrasta: " + (diag.ClosedImpossibleReason ?? "slēgtās secības meklēšana neizdevās (pierādījuma, ka tā neiespējama, nav)"));
                 WriteOpenPathIntermediate(outPath, surfaceCells, sensorCells, path, LastDetection, diag);
-                Console.WriteLine("[INFO] Ja atvērtu ceļu tomēr vajag kā gala rezultātu, palaid ar --atlaut-atvertu.");
                 return;
             }
+            // aizpildītai virsmai (bez līnijas galiem) papildus saglabājam atvērtās secības attēlu - lai redz, kur secība sākas un beidzas
+            if (!closed && !forcedEnds)
+                WriteOpenPathIntermediate(outPath, surfaceCells, sensorCells, path, LastDetection, diag);
 
             string result = RenderFFseciba(surfaceCells, path);
-            string savedPath = SafeWrite(outPath, fp => File.WriteAllText(fp, result, System.Text.Encoding.UTF8));
+            string savedPath = SafeWrite(outPath, fp => File.WriteAllText(fp, result, Utf8NoBom));
             Console.WriteLine($"[OK] Saglabāts {savedPath}");
         }
     }

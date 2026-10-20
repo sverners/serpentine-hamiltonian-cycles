@@ -2,7 +2,7 @@
 
 🇱🇻 Latviski: [LasiMani.md](LasiMani.md)
 
-**VCSM** (Vector Cycling Stitching Method) is a set of tools for knight's-move
+**VCSM** (Vector Chain Spatial Model) is a set of tools for knight's-move
 sequences and the **Hamiltonian cycles/paths** built from them. It is aimed at
 prepress, textile and CNC/laser work, where a continuous "serpentine" path that
 visits every cell of a surface exactly once is useful for real physical
@@ -112,7 +112,7 @@ Png2Seciba --ffseciba=FFseciba.txt --aizpildit=cikls.hrz
 **Image conventions.** Black = surface to be visited, white = sensors / forbidden
 zones. One cell = 4×4 pixels. Black areas thinner than 12 px are thinned to a
 one-cell line; thicker areas are treated as filled surface of any outline.
-Tiny black specks (under 60 px) are ignored as noise. Leftover pixels at the
+A hollow outline such as a frame (its bounding box is less than 20 % black) is treated as a thin line, not as a filled rectangle. Tiny black specks (under 60 px) are ignored as noise. A cell with a single neighbour inside a filled area (a rasterisation spur, e.g. a narrow notch between the points of a star) is not a line end: it is left empty and can be filled later like the other empty cells. Leftover pixels at the
 right/bottom edge count as a full cell, and an odd number of rows/columns is made
 even by copying the last filled row/column.
 
@@ -120,10 +120,10 @@ even by copying the last filled row/column.
 
 | File | Content |
 |---|---|
-| `FFseciba.txt` | The block order (visit order number per cell). Written only for a closed cycle (see `--atlaut-atvertu`). |
+| `FFseciba.txt` | The block order (visit order number per cell). It may be **closed** or **open** (a start and an end, like a letter S): every block is a closed cycle itself, so the final HC assembled from the blocks is a whole closed cycle either way. |
 | `FFseciba_karte.png` / `.txt` | Diagnostic map: **green** = surface (OK), **white** = forbidden (sensors), **red** = cells left empty, **yellow** = forced end. A banner states whether a cycle is possible and why not. |
 | `FFseciba_tuksas.txt` | Cells left empty (`row,column`); empty file if there are none. |
-| `FFseciba_starprezultats.txt` / `.png` | Intermediate result when only an **open** path exists: numbered path and a picture with start/end marked, so that the picture can be corrected. |
+| `FFseciba_starprezultats.txt` / `.png` | Picture of an **open** block order for a filled surface (start `S` and end `G` marked), as a diagnostic; with `--atteikt-atvertu` it is the only result. |
 
 If an output file is locked by another program (e.g. Excel), the result is not
 lost: it is saved as `name_1.txt`, `name_2.txt`, ... and a warning is printed.
@@ -132,7 +132,8 @@ lost: it is saved as `name_1.txt`, `name_2.txt`, ... and a warning is printed.
 
 | Option | Meaning |
 |---|---|
-| `--atlaut-atvertu` | Accept an open path as the final result. Thin-line shapes always have line ends, so they need this option. |
+| `--atteikt-atvertu` | Strict mode: refuse an open block order (only the diagnostic picture is written). By default an open order is accepted. |
+| `--slegta-secibu` | Look for a **closed** block order even if that needs more empty cells (by default an open order is enough, so fewer cells are left empty). |
 | `--tikai-karte` | Write the map and diagnostics and stop before the open-path search. |
 | `--laiks=SEC` | Time limit per search stage (default 120, 0 = none). |
 | `--forse` | Search even if a cycle/path is proven impossible (fill mode: allow a smaller `.hrz` grid). |
@@ -147,12 +148,14 @@ lost: it is saved as `name_1.txt`, `name_2.txt`, ... and a warning is printed.
 
 ## Empty cells and how they are filled
 
-**Why cells can stay empty.** Colour the cells like a chessboard. Every step of a
-cell-level cycle changes the colour, so a closed cycle over all cells needs equally
-many cells of both colours. Shapes with, for example, a circular cut-out often have
-a few cells more of one colour. Png2Seciba then leaves the minimum number of cells
-**empty**, placed together as one diagonal chain (the start cell is never removed),
-verifies that a cycle exists for the rest, and lists the empty cells: in
+**Why cells can stay empty.** Colour the cells like a chessboard. Every step of the
+block order changes the colour, so a closed order over all cells needs equally many
+cells of both colours, and an open one (start and end) allows a difference of 1.
+Shapes with, for example, a circular cut-out often have a few cells more of one
+colour. Png2Seciba then leaves the minimum number of cells **empty** (the colour
+difference minus 1; with `--slegta-secibu` the whole difference), placed together as
+one diagonal chain (the start cell is never removed), verifies that a block order
+exists for the rest, and lists the empty cells: in
 `FFseciba_tuksas.txt` and as a **red notice** in the console (nothing is printed
 if there are no empty cells).
 
@@ -174,7 +177,7 @@ visits the previously empty cells.
 
 - **`.hrz` / `.vrz` / `.txt`**: a path as a digit string (each digit 1-8 is one move direction).
 - **`.bin`**: the same data in a more compact binary form.
-- **`FFseciba.txt`**: a CSV-style cell grid where each cell holds its visit order number (or is empty if the cell is not visited: sensor, outside the shape, or a cell left empty).
+- **`FFseciba.txt`**: a CSV-style cell grid where each cell holds its visit order number (or is empty if the cell is not visited: sensor, outside the shape, or a cell left empty). It is written as UTF-8 **without BOM**, so that scripts reading it with plain `utf-8` see the first cell correctly.
 - **`FFseciba_tuksas.txt`**: cells left empty, one `row,column` per line.
 - **`FFseciba_karte.png` / `.txt`**: diagnostic map of the detected surface.
 - **`.abt`**: a catalogue of 6×6 (or 16×16) "torn" blocks with a manifest, used by `serpentina_hc_v12.py` to match blocks.

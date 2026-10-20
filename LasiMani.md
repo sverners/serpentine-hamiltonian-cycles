@@ -2,7 +2,7 @@
 
 🇬🇧 English: [README.md](README.md)
 
-**VCSM** (Vector Cycling Stitching Method) ir rīku kopa šaha zirdziņa gājienu
+**VCSM** (Vector Chain Spatial Model) ir rīku kopa šaha zirdziņa gājienu
 virknēm un no tām veidotiem **Hamiltona cikliem/ceļiem** — ar pielietojumu
 prepress, tekstila un CNC/lāzera darbos, kur "serpentīna" tipa nepārtraukts
 ceļš, kas apmeklē katru virsmas šūnu tieši vienu reizi, ir noderīgs reālai
@@ -112,8 +112,8 @@ Png2Seciba --ffseciba=FFseciba.txt --aizpildit=cikls.hrz
 **Attēla noteikumi.** Melns = virsma, kas jāapmeklē, balts = sensori / aizliegtās
 zonas. Viena šūna = 4×4 pikseļi. Melni apgabali, kas plānāki par 12 px, tiek
 iztieknoti līdz vienas šūnas līnijai; biezāki apgabali tiek uzskatīti par jebkuras
-aprises aizpildītu virsmu. Sīki melni plankumi (mazāki par 60 px) tiek ignorēti kā
-troksnis. Pārpalikušie pikseļi labajā/apakšējā malā skaitās kā pilna šūna, un
+aprises aizpildītu virsmu. Tukša kontūra, piemēram, rāmis (tā aptverošais taisnstūris ir mazāk nekā 20 % melns), tiek uzskatīta par tievu līniju, nevis aizpildītu taisnstūri. Sīki melni plankumi (mazāki par 60 px) tiek ignorēti kā
+troksnis. Šūna ar vienu kaimiņu aizpildītas virsmas iekšienē (rasterizācijas izvirzījums, piem. šaurs kakliņš starp zvaigznes stariem) nav līnijas gals: tā tiek atstāta tukša un vēlāk tiek aizpildīta tāpat kā citas tukšās šūnas. Pārpalikušie pikseļi labajā/apakšējā malā skaitās kā pilna šūna, un
 nepāra rindu/kolonnu skaits tiek izlīdzināts uz pāra, nokopējot pēdējo aizpildīto
 rindu/kolonnu.
 
@@ -121,10 +121,10 @@ rindu/kolonnu.
 
 | Fails | Saturs |
 |---|---|
-| `FFseciba.txt` | Bloku secība (apmeklēšanas kārtas numurs katrai šūnai). Tiek rakstīts tikai slēgtam ciklam (skat. `--atlaut-atvertu`). |
+| `FFseciba.txt` | Bloku secība (apmeklēšanas kārtas numurs katrai šūnai). Tā var būt **slēgta** vai **atvērta** (sākums un gals, kā burtam S): katrs bloks pats ir slēgts cikls, tāpēc no blokiem salikts gala HC abos gadījumos ir vesels slēgts cikls. |
 | `FFseciba_karte.png` / `.txt` | Diagnostikas karte: **zaļš** = virsma (OK), **balts** = aizliegts (sensori), **sarkans** = tukšās šūnas, **dzeltens** = piespiedu gals. Josla augšā paziņo, vai cikls ir iespējams un kāpēc nav. |
 | `FFseciba_tuksas.txt` | Tukšās šūnas (`rinda,kolonna`); fails ir tukšs, ja tādu nav. |
-| `FFseciba_starprezultats.txt` / `.png` | Starprezultāts, ja iespējams tikai **atvērts** ceļš: numurēts ceļš un attēls ar atzīmētu sākumu/beigām, lai attēlu varētu izlabot. |
+| `FFseciba_starprezultats.txt` / `.png` | Aizpildītas virsmas **atvērtās** bloku secības attēls (atzīmēts sākums `S` un gals `G`) kā diagnostika; ar `--atteikt-atvertu` tas ir vienīgais rezultāts. |
 
 Ja izvades failu izmanto cita programma (piem., Excel), rezultāts netiek zaudēts:
 tas tiek saglabāts kā `nosaukums_1.txt`, `nosaukums_2.txt`, ... un tiek izdrukāts
@@ -134,7 +134,8 @@ brīdinājums.
 
 | Opcija | Nozīme |
 |---|---|
-| `--atlaut-atvertu` | Pieņemt atvērtu ceļu kā gala rezultātu. Tievo līniju formām vienmēr ir līnijas gali, tāpēc tām šī opcija ir vajadzīga. |
+| `--atteikt-atvertu` | Stingrais režīms: atteikties no atvērtas bloku secības (tiek rakstīts tikai diagnostikas attēls). Pēc noklusējuma atvērta secība tiek pieņemta. |
+| `--slegta-secibu` | Meklēt **slēgtu** bloku secību arī tad, ja tam jāatstāj vairāk tukšo šūnu (pēc noklusējuma pietiek ar atvērtu, tāpēc tukšo šūnu ir mazāk). |
 | `--tikai-karte` | Saglabāt karti un diagnostiku un apstāties pirms atvērtā ceļa meklēšanas. |
 | `--laiks=SEK` | Laika ierobežojums katram meklēšanas posmam (noklusējums 120, 0 = bez ierobežojuma). |
 | `--forse` | Meklēt arī tad, ja pierādīts, ka cikls/ceļš neiespējams (aizpildīšanas režīmā: atļaut mazāku `.hrz` tīklu). |
@@ -150,11 +151,13 @@ brīdinājums.
 ## Tukšās šūnas un to aizpildīšana
 
 **Kāpēc šūnas var palikt tukšas.** Nokrāso šūnas kā šaha galdiņu. Katrā solī
-mainās krāsa, tāpēc slēgtam ciklam pa visām šūnām abu krāsu šūnu skaitam jābūt
-vienādam. Formām, piemēram, ar apaļu izgriezumu, bieži vienas krāsas šūnu ir par
-dažām vairāk. Tad Png2Seciba atstāj minimālo skaitu šūnu **tukšas**, izvieto tās
-kopā kā vienu diagonālu ķēdi (sākuma šūna netiek noņemta), pārbauda, ka pārējai
-virsmai cikls eksistē, un uzskaita tukšās šūnas: `FFseciba_tuksas.txt` failā un
+mainās krāsa, tāpēc slēgtai bloku secībai pa visām šūnām abu krāsu šūnu skaitam
+jābūt vienādam, bet atvērtai (sākums un gals) starpība drīkst būt 1. Formām,
+piemēram, ar apaļu izgriezumu, bieži vienas krāsas šūnu ir par dažām vairāk. Tad
+Png2Seciba atstāj minimālo skaitu šūnu **tukšas** (krāsu starpība mīnus 1; ar
+`--slegta-secibu` visa starpība), izvieto tās kopā kā vienu diagonālu ķēdi (sākuma
+šūna netiek noņemta), pārbauda, ka pārējai virsmai bloku secība eksistē, un
+uzskaita tukšās šūnas: `FFseciba_tuksas.txt` failā un
 **sarkanā paziņojumā** konsolē (ja tukšu šūnu nav, nekas netiek izdrukāts).
 
 **Kā tās aizpilda.** Katra šūna pati par sevi ir slēgts bloks (zirdziņa cikls).
@@ -175,7 +178,7 @@ iepriekš tukšās šūnas.
 
 - **`.hrz` / `.vrz` / `.txt`** — ceļa gājienu virkne kā ciparu teksts (1-8 katrs cipars).
 - **`.bin`** — tas pats, bināri kompaktākā formā.
-- **`FFseciba.txt`** — CSV tipa rūtiņu tīkls, kur katra šūna satur tās apmeklējuma kārtas numuru (vai tukša, ja šūna netiek apmeklēta: sensors, ārpus formas vai tukšā šūna).
+- **`FFseciba.txt`** — CSV tipa rūtiņu tīkls, kur katra šūna satur tās apmeklējuma kārtas numuru (vai tukša, ja šūna netiek apmeklēta: sensors, ārpus formas vai tukšā šūna). Tiek rakstīts kā UTF-8 **bez BOM**, lai skripti, kas to lasa ar parasto `utf-8`, pareizi redzētu pirmo šūnu.
 - **`FFseciba_tuksas.txt`** — tukšās šūnas, katrā rindā `rinda,kolonna`.
 - **`FFseciba_karte.png` / `.txt`** — atpazītās virsmas diagnostikas karte.
 - **`.abt`** — 6×6 (vai 16×16) "plēsto" bloku katalogs ar manifestu, ko izmanto `serpentina_hc_v12.py` bloku saskaņošanai.

@@ -22,6 +22,7 @@ pārveidot ļoti garus ceļus (simtiem tūkstošu gājienu).
   - [Tīmekļa skatītājs](#tīmekļa-skatītājs)
 - [Png2Seciba sīkāk](#png2seciba-sīkāk)
 - [Tukšās šūnas un to aizpildīšana](#tukšās-šūnas-un-to-aizpildīšana)
+- [Slēgta HC pārbaude](#slēgta-hc-pārbaude)
 - [Failu formāti](#failu-formāti)
 - [Prasības](#prasības)
 
@@ -173,6 +174,19 @@ iepriekš tukšās šūnas.
 - Rezultāts tiek pārbaudīts: viens slēgts cikls, visi punkti unikāli, visi bloki pilni.
 - Vajadzīgs slēgts `.hrz` no pilniem N×N blokiem un tas pats attēls vai FFseciba
   fails. Šūnu, kurai nav neviena apmeklēta kaimiņa, aizpildīt nevar.
+
+## Slēgta HC pārbaude
+
+Slēgtu HC var pārbaudīt bez īpaša rīka. Sadali `.hrz` ciparu virkni jebkurā vietā
+un **apmaini abas daļas vietām**. Derīgam slēgtam ciklam rezultāts ir **tas pats HC**:
+tā pati šūnu kopa un tāds pats platums × augstums; mainās tikai sākuma/beigu šūna
+(cikls vienkārši sākas citā vietā). Ja izmērs vai dažādo šūnu skaits mainās, virkne
+nav slēgts cikls (nepareizs cipars, sprauga vai atvērts ceļš). Vēl divas ātras
+pārbaudes: gājienu summai jādod nulles nobīde, un neviena šūna nedrīkst tikt
+apmeklēta divreiz.
+
+Tāpēc arī lūzuma punkta/rotācijas funkcijas savienotājā un `mikroScope.html` formu
+nemaina. Pārbaude neder atvērtiem ceļiem: atvērta ceļa daļu apmaiņa dod citu formu.
 
 ## Failu formāti
 

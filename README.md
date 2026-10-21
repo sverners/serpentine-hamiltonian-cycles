@@ -22,6 +22,7 @@ long paths (hundreds of thousands of moves) compactly.
   - [Web viewer](#web-viewer)
 - [Png2Seciba in detail](#png2seciba-in-detail)
 - [Empty cells and how they are filled](#empty-cells-and-how-they-are-filled)
+- [Checking a closed HC](#checking-a-closed-hc)
 - [File formats](#file-formats)
 - [Requirements](#requirements)
 
@@ -172,6 +173,20 @@ visits the previously empty cells.
 - The result is verified: a single closed cycle, all points unique, every block complete.
 - Needs a closed `.hrz` built from complete N×N blocks and the same image or
   FFseciba file. A cell without any visited neighbour cannot be filled.
+
+## Checking a closed HC
+
+A closed HC can be checked without any special tool. Split the digit string of the
+`.hrz` at any point and **swap the two parts**. For a valid closed cycle the result is
+the **same HC**: the same set of cells and the same width × height; only the start/end
+cell moves (the loop simply starts somewhere else). If the size or the number of
+distinct cells changes, the string is not a closed cycle (a wrong digit, a gap, or an
+open path). Two more quick checks: the moves must add up to zero displacement, and no
+cell may be visited twice.
+
+This is also why the break-point/rotation functions of the joiner and `mikroScope.html`
+do not change the shape. The test does not apply to open paths: swapping the parts of
+an open path gives a different shape.
 
 ## File formats
 

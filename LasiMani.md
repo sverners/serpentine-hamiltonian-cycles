@@ -2,7 +2,7 @@
 
 🇬🇧 English: [README.md](README.md)
 
-**VCSM** (Vector Chain Spatial Model) ir rīku kopa šaha zirdziņa gājienu
+**VCSM** (Vector Cycling Stitched Method) ir rīku kopa šaha zirdziņa gājienu
 virknēm un no tām veidotiem **Hamiltona cikliem/ceļiem** — ar pielietojumu
 prepress, tekstila un CNC/lāzera darbos, kur "serpentīna" tipa nepārtraukts
 ceļš, kas apmeklē katru virsmas šūnu tieši vienu reizi, ir noderīgs reālai
